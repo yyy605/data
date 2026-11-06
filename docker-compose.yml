@@ -1,0 +1,26 @@
+services:
+  daily-report:
+    build: .
+    image: smart-daily-report-generator:latest
+    container_name: smart-daily-report
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      CRON_SCHEDULE: "0 18 * * 1-5"
+      CRON_TZ: "Asia/Shanghai"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./data:/app/data
+      - ./reports:/app/reports
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", ".venv/bin/python", "main.py", "--check", "--config", "config.yaml"]
+      interval: 1h
+      timeout: 60s
+      retries: 3
+      start_period: 30s
