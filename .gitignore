@@ -12,6 +12,7 @@ desktop.ini
 .env
 .env.*
 !.env.example
+config.yaml
 
 # Python
 __pycache__/
@@ -20,6 +21,8 @@ __pycache__/
 venv/
 .pytest_cache/
 .mypy_cache/
+.coverage
+htmlcov/
 .ruff_cache/
 
 # Node.js
@@ -35,4 +38,5 @@ out/
 
 # Generated reports
 reports/
+data/
 output/

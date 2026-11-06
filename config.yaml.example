@@ -1,0 +1,50 @@
+team:
+  name: "研发团队"
+  timezone: "Asia/Shanghai"
+
+schedule:
+  hour: 18
+  minute: 0
+
+members:
+  # github_login / lark_user_id / email are mapped to the same team member.
+  - github_login: "github-user-1"
+    lark_user_id: "ou_example_user_1"
+    name: "成员一"
+    email: "member1@example.com"
+  - github_login: "github-user-2"
+    lark_user_id: "ou_example_user_2"
+    name: "成员二"
+    email: "member2@example.com"
+
+github:
+  token_env: "GITHUB_TOKEN"
+  repositories:
+    - owner: "example-org"
+      name: "example-repository"
+
+lark:
+  app_id_env: "LARK_APP_ID"
+  app_secret_env: "LARK_APP_SECRET"
+  project_id: "example-project-id"
+  chat_id: "oc_example_chat_id"
+  webhook_url_env: "LARK_WEBHOOK_URL"
+  keywords:
+    - "项目"
+    - "需求"
+    - "风险"
+  excluded_keywords:
+    - "薪资"
+    - "绩效"
+
+smtp:
+  host_env: "SMTP_HOST"
+  port_env: "SMTP_PORT"
+  username_env: "SMTP_USERNAME"
+  password_env: "SMTP_PASSWORD"
+  from_env: "SMTP_FROM"
+  recipients:
+    - "leader@example.com"
+
+storage:
+  sqlite_path: "data/reports.db"

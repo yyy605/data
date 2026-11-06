@@ -1,0 +1,22 @@
+[project]
+name = "smart-daily-report-generator"
+version = "0.1.0"
+description = "Automatically collect team activity and generate daily reports"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27,<1",
+    "jinja2>=3.1,<4",
+    "pyyaml>=6.0,<7",
+    "tzdata>=2024.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0,<9",
+    "pytest-httpx>=0.30,<1",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+pythonpath = ["."]
