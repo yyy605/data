@@ -60,6 +60,7 @@ smtp:
     - "leader@example.com"
 storage:
   sqlite_path: "{sqlite_path}"
+  reports_dir: "{reports_dir}"
 """
 
 
@@ -80,8 +81,12 @@ def config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppConfig:
         monkeypatch.setenv(name, value)
 
     sqlite_path = (tmp_path / "data" / "reports.db").as_posix()
+    reports_dir = (tmp_path / "reports").as_posix()
     config_path = tmp_path / "config.yaml"
-    config_path.write_text(CONFIG_TEMPLATE.format(sqlite_path=sqlite_path), encoding="utf-8")
+    config_path.write_text(
+        CONFIG_TEMPLATE.format(sqlite_path=sqlite_path, reports_dir=reports_dir),
+        encoding="utf-8",
+    )
     return load_config(config_path)
 
 
@@ -267,6 +272,34 @@ def test_dry_run_skips_delivery(config, pushes, monkeypatch):
     assert stored_report(config) is not None
     assert pushes["email"] == []
     assert pushes["lark_bot"] == []
+
+
+def test_report_files_are_exported(config, pushes, monkeypatch, tmp_path):
+    stub_collectors(monkeypatch, github_records=[commit()])
+
+    assert main.run(config, REPORT_DATE, dry_run=True, force=True) == 0
+
+    reports_dir = tmp_path / "reports"
+    markdown_file = reports_dir / f"{REPORT_DATE.isoformat()}.md"
+    html_file = reports_dir / f"{REPORT_DATE.isoformat()}.html"
+    assert markdown_file.is_file()
+    assert html_file.is_file()
+    assert markdown_file.read_text(encoding="utf-8") == stored_report(config)["markdown"]
+    assert html_file.read_text(encoding="utf-8") == stored_report(config)["html"]
+
+
+def test_file_export_failure_does_not_block_delivery(config, pushes, monkeypatch, tmp_path):
+    stub_collectors(monkeypatch, github_records=[commit()])
+
+    def boom(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(main, "export_report_files", boom)
+
+    assert main.run(config, REPORT_DATE, force=True) == 0
+    assert len(pushes["email"]) == 1
+    assert len(pushes["lark_bot"]) == 1
+    assert stored_report(config) is not None
 
 
 def test_full_flow_completes_well_under_60_seconds(config, pushes, monkeypatch):

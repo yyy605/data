@@ -6,8 +6,8 @@
 | 分支 | `main` |
 | 被验收的代码提交 | `5abc23c` |
 | 验收日期 | 2026-11-12 |
-| 代码规模 | 源码 16 文件 1896 行；测试 10 文件 1022 行 |
-| 自动化测试 | **63 个用例，全部通过** |
+| 代码规模 | 源码 16 文件 2345 行；测试 10 文件 1382 行 |
+| 自动化测试 | **67 个用例，全部通过** |
 
 本报告只记录**实测结果**。无法在当前环境验证的项目均明确标注为「待验证」，不做推测性结论。
 
@@ -79,7 +79,7 @@
 | Python 3.11+ | ✅ `requires-python = ">=3.11"` |
 | Docker 容器化部署 | ✅ 镜像 286MB 构建成功，容器内 CLI 与 cron 调度均验证通过 |
 | Cron 定时、无常驻服务 | ✅ 容器内 `/etc/cron.d/daily-report`，`0 18 * * 1-5`，`CRON_TZ=Asia/Shanghai` |
-| 本地 SQLite 存储 | ✅ `data/reports.db`，写入/查询/覆盖更新均有单测 |
+| 本地 SQLite 存储 | ✅ `data/reports.db`，写入/查询/覆盖更新均有单测；另导出 `reports/<日期>.md|.html` 副本 |
 | 外部依赖 | ✅ GitHub API、飞书开放平台、SMTP 均实测可达 |
 
 ---
@@ -148,7 +148,7 @@ uv run python main.py --check        # 连通性自检
 uv run python main.py --dry-run      # 采集+生成，不推送
 uv run python main.py                # 完整流程
 uv run python main.py --date 2026-11-12 --force   # 指定日期并跳过非工作日
-uv run pytest -q                     # 运行测试（63 项）
+uv run pytest -q                     # 运行测试（67 项）
 ```
 
 退出码：`0` 成功（含跳过非工作日、dry-run）；`1` 配置错误、全部数据源失败或推送失败。

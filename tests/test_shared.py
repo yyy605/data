@@ -7,7 +7,7 @@ import pytest
 from shared.config import load_config
 from shared.errors import ConfigurationError
 from shared.logger import JsonLineFormatter
-from shared.storage import ReportStorage
+from shared.storage import ReportStorage, export_report_files
 
 
 def test_load_config_reads_example():
@@ -87,3 +87,21 @@ def test_storage_upserts_same_report_date(tmp_path):
     storage.save_report("2026-11-06", "研发团队", "new", "<p>new</p>")
 
     assert storage.list_reports()[-1]["markdown"] == "new"
+
+
+def test_export_writes_markdown_and_html_files(tmp_path):
+    written = export_report_files(tmp_path / "reports", "2026-11-12", "# 日报", "<h1>日报</h1>")
+
+    assert [path.name for path in written] == ["2026-11-12.md", "2026-11-12.html"]
+    assert (tmp_path / "reports" / "2026-11-12.md").read_text(encoding="utf-8") == "# 日报"
+    assert (tmp_path / "reports" / "2026-11-12.html").read_text(encoding="utf-8") == "<h1>日报</h1>"
+    assert not list((tmp_path / "reports").glob("*.tmp"))
+
+
+def test_export_overwrites_same_date_without_leftovers(tmp_path):
+    export_report_files(tmp_path / "reports", "2026-11-12", "old", "<p>old</p>")
+    export_report_files(tmp_path / "reports", "2026-11-12", "new", "<p>new</p>")
+
+    files = sorted(path.name for path in (tmp_path / "reports").iterdir())
+    assert files == ["2026-11-12.html", "2026-11-12.md"]
+    assert (tmp_path / "reports" / "2026-11-12.md").read_text(encoding="utf-8") == "new"

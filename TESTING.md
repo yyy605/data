@@ -4,9 +4,9 @@
 | --- | --- |
 | 测试框架 | pytest 8.x |
 | 测试文件 | 10 个（`tests/`） |
-| 测试函数 | 61 个 |
-| 实际用例 | **63 个**（2 个参数化） |
-| 最近执行结果 | **63 passed** |
+| 测试函数 | 65 个 |
+| 实际用例 | **67 个**（2 个参数化） |
+| 最近执行结果 | **67 passed** |
 | 执行耗时 | 约 0.4s（全部使用 Mock，不访问网络） |
 
 配套文档：[ACCEPTANCE.md](./ACCEPTANCE.md)（验收结果报告）、[task.md](./task.md)（任务清单）。
@@ -17,7 +17,7 @@
 
 ```
         ┌─────────────────────────────┐
-   E2E  │ test_integration.py  (7)    │  完整管道：采集→生成→存库→推送
+   E2E  │ test_integration.py  (9)    │  完整管道：采集→生成→存库→导出→推送
         ├─────────────────────────────┤
   单元  │ test_github.py        (6)   │  ┐
         │ test_lark_task.py     (8)   │  │ 采集层
@@ -25,7 +25,7 @@
         │ test_generator.py     (9)   │  生成层
         │ test_email.py         (6)   │  ┐ 推送层
         │ test_lark_bot.py      (5)   │  ┘
-        │ test_shared.py        (6)   │  基础层
+        │ test_shared.py        (8)   │  基础层
         │ test_schedule.py     (10)   │  调度规则
         └─────────────────────────────┘
 ```
@@ -64,7 +64,7 @@ uv run pytest -v
 
 ## 三、测试用例清单
 
-### 3.1 基础层 — `tests/test_shared.py`（6）
+### 3.1 基础层 — `tests/test_shared.py`（8）
 
 | 用例 | 验证内容 |
 | --- | --- |
@@ -74,6 +74,8 @@ uv run pytest -v
 | `test_json_log_formatter_outputs_valid_json` | 日志输出为合法 JSON，`extra_*` 字段被展开为顶层键，含 logger 名与 message |
 | `test_storage_creates_saves_reads_and_lists_report` | SQLite 自动建库建表，写入后可按日期读取，列表按日期倒序 |
 | `test_storage_upserts_same_report_date` | 同一日期重复写入时执行覆盖更新，不产生重复记录 |
+| `test_export_writes_markdown_and_html_files` | 导出 `<日期>.md` / `<日期>.html`，内容与传入一致，且不残留 `.tmp` 临时文件 |
+| `test_export_overwrites_same_date_without_leftovers` | 同日重复导出覆盖旧文件，目录内不产生多余文件 |
 
 ### 3.2 GitHub 采集 — `tests/test_github.py`（6）
 
@@ -158,7 +160,7 @@ uv run pytest -v
 | `test_manual_workdays_override_calendar` | `schedule.workdays` 手工覆盖优先于日历库 |
 | `test_falls_back_to_weekday_detection_when_calendar_missing` | 日历库不可用时降级为按星期判断，不崩溃 |
 
-### 3.9 端到端集成 — `tests/test_integration.py`（7）
+### 3.9 端到端集成 — `tests/test_integration.py`（9）
 
 | 用例 | 验证内容 |
 | --- | --- |
@@ -169,6 +171,8 @@ uv run pytest -v
 | `test_dry_run_skips_delivery` | `--dry-run` 生成并入库，但完全不推送 |
 | `test_full_flow_completes_well_under_60_seconds` | 全流程耗时断言 < 60s（对应 proposal 3.2） |
 | `test_non_working_day_is_skipped` | 周末直接跳过：不生成、不推送 |
+| `test_report_files_are_exported` | 流程结束后 `reports/` 下生成 md/html，内容与数据库记录逐字一致 |
+| `test_file_export_failure_does_not_block_delivery` | 文件写入抛 `OSError` 时日报仍入库并正常推送，退出码 0 |
 
 ---
 
@@ -286,9 +290,9 @@ docker compose run --rm daily-report python main.py --check
 
 | 指标 | 基线 |
 | --- | --- |
-| 用例总数 | 63 |
+| 用例总数 | 67 |
 | 必须通过率 | 100% |
-| 执行时间上限 | < 5s（当前 0.4s） |
+| 执行时间上限 | < 5s（当前 0.5s） |
 | 网络依赖 | 0（全部 Mock） |
 
 新增功能时应同步新增测试，且不得降低既有通过率。修改以下文件时必须运行对应测试文件：

@@ -22,7 +22,7 @@ from notifier import email, lark_bot
 from shared.config import AppConfig, load_config
 from shared.errors import ConfigurationError
 from shared.logger import configure_logging, log_extra
-from shared.storage import ReportStorage
+from shared.storage import ReportStorage, export_report_files
 
 SOURCE_GITHUB = "github"
 SOURCE_LARK_TASK = "lark_task"
@@ -115,6 +115,23 @@ def run(
         storage.save_report(report.date, report.team, report.markdown, report.html)
     except (OSError, ValueError) as exc:
         logger.error("Daily report could not be stored", exc_info=True, extra=log_extra(error=str(exc)))
+
+    try:
+        exported = export_report_files(
+            _reports_dir(config), report.date, report.markdown, report.html
+        )
+        logger.info(
+            "Daily report exported to files",
+            extra=log_extra(files=[str(path) for path in exported]),
+        )
+    except OSError as exc:
+        # The database copy already exists, so a file export failure must not
+        # abort delivery.
+        logger.error(
+            "Daily report files could not be written",
+            exc_info=True,
+            extra=log_extra(error=str(exc)),
+        )
 
     if dry_run:
         logger.info(
@@ -526,6 +543,11 @@ def _matches(keys: set[str], value: Any) -> bool:
 
 def _storage_path(config: AppConfig) -> str:
     return str(config["storage"]["sqlite_path"])
+
+
+def _reports_dir(config: AppConfig) -> str:
+    section = config["storage"]
+    return str(section.get("reports_dir") or "reports")
 
 
 def _api_time(value: datetime) -> datetime:

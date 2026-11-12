@@ -1,7 +1,8 @@
-"""SQLite persistence for generated daily reports."""
+"""Persistence for generated daily reports: SQLite records plus file exports."""
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -80,3 +81,27 @@ class ReportStorage:
                 (limit,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+
+def export_report_files(
+    reports_dir: str | Path,
+    report_date: str,
+    markdown: str,
+    html: str,
+) -> list[Path]:
+    """Write the dated Markdown and HTML files into ``reports_dir``.
+
+    Files are replaced atomically so a crash cannot leave a half-written
+    report behind, and re-running the same date simply overwrites the pair.
+    """
+    directory = Path(reports_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+
+    written: list[Path] = []
+    for suffix, content in ((".md", markdown), (".html", html)):
+        target = directory / f"{report_date}{suffix}"
+        temporary = target.with_suffix(target.suffix + ".tmp")
+        temporary.write_text(content, encoding="utf-8", newline="\n")
+        os.replace(temporary, target)
+        written.append(target)
+    return written

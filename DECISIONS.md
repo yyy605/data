@@ -43,6 +43,7 @@
 | ADR-019 | 采集窗口 | 滚动 24 小时，不用自然日 00:00 起 | `main.py:_collection_window` |
 | ADR-020 | 调度形态 | 容器内 cron，不用 APScheduler 常驻进程 | `docker/entrypoint.sh` |
 | ADR-021 | 容器入口 | 一个脚本双模式（调度 / 一次性命令） | `docker/entrypoint.sh` |
+| ADR-022 | 报告落盘 | 除 SQLite 外，另存 `<日期>.md` / `<日期>.html` 到 `reports/` | `shared/storage.py:export_report_files` |
 
 ---
 
@@ -654,6 +655,34 @@ cron 不继承容器环境变量，因此入口脚本会把 `os.environ` 落盘�
 
 **什么情况下应该重新评估**
 需要更复杂的启动编排时，考虑用 `tini`/`s6-overlay` 之类。
+
+---
+
+## ADR-022 报告同时落盘为文件
+
+- **状态**：已采纳
+- **日期**：2026-11-12
+- **代码位置**：`shared/storage.py:export_report_files`、`main.py:run`
+
+**当时的问题**
+早期只把日报写进 SQLite，`docker-compose.yml` 里挂载的 `./reports` 和 `Dockerfile` 里的 `mkdir -p /app/reports` 成了死配置——目录存在但永远是空的。实际使用中想看某天的日报，只能写 Python 或 SQL 去库里捞。
+
+**考虑过的方案**
+
+| 方案 | 优点 | 为什么没选 |
+| --- | --- | --- |
+| 只存数据库（原状） | 单一事实源，无一致性问题 | 无法直接用编辑器/浏览器打开；`reports/` 成为误导性的死配置 |
+| 只存文件 | 直观、可直接归档 | 无法按日期唯一索引与结构化查询；重跑易产生重复文件 |
+| **数据库为主 + 文件为副本** ✅ | 库用于查询与幂等，文件用于人读与归档；两者内容同源同次写入 | — |
+
+**决定**
+`ReportStorage` 仍负责 SQLite；新增 `export_report_files()` 把同一份 `markdown`/`html` 写成 `reports/<日期>.md` 与 `reports/<日期>.html`。写入用「临时文件 + `os.replace`」保证原子性，同日重跑直接覆盖，不留部分文件。
+
+**代价 / 已知不足**
+存在两份副本，理论上可能不一致（例如手工删了文件、或手工改了文件）。当前以数据库为准，文件只是导出物；若文件写入失败，**不阻断推送**（库已存好），只记 ERROR 日志。目录可通过 `storage.reports_dir` 配置。
+
+**什么情况下应该重新评估**
+若出现"需要以文件为事实源"的诉求（如用 Git 管理日报历史），应反转方向：改为文件为主、库做索引，并加入一致性校验。
 
 ---
 

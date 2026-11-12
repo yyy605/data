@@ -54,3 +54,5 @@ smtp:
 
 storage:
   sqlite_path: "data/reports.db"
+  # Markdown/HTML copies of each report are written here as <date>.md / <date>.html
+  reports_dir: "reports"

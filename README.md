@@ -69,6 +69,7 @@ uv run pytest -q                  # 运行全部测试
 ### 数据说明
 
 - 日报历史记录写入 SQLite（`storage.sqlite_path`，默认 `data/reports.db`）
+- 同时导出人可读副本：`reports/<日期>.md` 与 `reports/<日期>.html`（目录由 `storage.reports_dir` 配置，默认 `reports`）。两者与数据库同源同次写入，同日重跑覆盖；文件写入失败不会阻断推送
 - 采集窗口为**滚动 24 小时**：结束时间是执行时刻（或 `--date` 指定日期的当日 23:59:59），起点为终点前 24 小时；时区取 `team.timezone`
 - 成员归属通过 `members` 中的 `github_login`、`lark_user_id`、`name`、`email` 映射
 - 非工作日跳过：法定节假日与调休由 `chinesecalendar` 库自动识别；`schedule.holidays` / `schedule.workdays` 可手工覆盖个别日期；无需跳过时使用 `--force`
