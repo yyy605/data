@@ -3,6 +3,7 @@
 自动从 GitHub、飞书任务与飞书群消息中采集团队当日工作数据，生成结构化日报（Markdown + HTML），并通过邮件与飞书机器人推送。
 
 需求与设计见 [proposal.md](./proposal.md)、[design.md](./design.md)、[task.md](./task.md)。
+测试说明见 [TESTING.md](./TESTING.md)，验收结果见 [ACCEPTANCE.md](./ACCEPTANCE.md)。
 
 ## 功能概览
 
