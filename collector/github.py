@@ -246,8 +246,22 @@ def _parse_datetime(value: Any) -> datetime:
 
 
 def _is_rate_limited(response: httpx.Response) -> bool:
+    """Distinguish real rate limiting from other 403 responses.
+
+    GitHub returns 403 both when the rate limit is exhausted and when the token
+    lacks permission for a repository; only the former should be retried.
+    """
+    if response.headers.get("Retry-After"):
+        return True
     remaining = response.headers.get("X-RateLimit-Remaining")
-    return remaining == "0" or response.status_code == 403
+    if remaining is not None:
+        return remaining.strip() == "0"
+    try:
+        payload = response.json()
+    except ValueError:
+        return False
+    message = str(payload.get("message", "")) if isinstance(payload, Mapping) else ""
+    return "rate limit" in message.lower()
 
 
 def _rate_limit_wait_seconds(response: httpx.Response) -> float:

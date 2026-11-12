@@ -67,9 +67,10 @@ uv run pytest -q                  # 运行全部测试
 ### 数据说明
 
 - 日报历史记录写入 SQLite（`storage.sqlite_path`，默认 `data/reports.db`）
-- 采集窗口默认为当日 00:00 至执行时刻（时区取 `team.timezone`）
+- 采集窗口为**滚动 24 小时**：结束时间是执行时刻（或 `--date` 指定日期的当日 23:59:59），起点为终点前 24 小时；时区取 `team.timezone`
 - 成员归属通过 `members` 中的 `github_login`、`lark_user_id`、`name`、`email` 映射
-- 非工作日跳过：周末由 `schedule.skip_weekends`（默认开启）控制，法定节假日写入 `schedule.holidays`（`YYYY-MM-DD` 列表）；无需跳过的场景可使用 `--force`
+- 非工作日跳过：法定节假日与调休由 `chinesecalendar` 库自动识别；`schedule.holidays` / `schedule.workdays` 可手工覆盖个别日期；无需跳过时使用 `--force`
+- 飞书任务采集使用 **Task v2** 接口 `/open-apis/task/v2/tasks`。该接口不支持服务端时间过滤，因此按 `updated_at` 在本地裁剪采集窗口；配置 `lark.tasklist_id` 可只采集指定任务清单（留空表示全部）
 
 ## Docker 部署
 

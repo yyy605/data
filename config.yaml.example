@@ -5,6 +5,10 @@ team:
 schedule:
   hour: 18
   minute: 0
+  # Chinese holidays and make-up workdays come from the chinesecalendar library.
+  # Use the lists below only to override specific dates (YYYY-MM-DD).
+  holidays: []
+  workdays: []
 
 members:
   # github_login / lark_user_id / email are mapped to the same team member.
@@ -26,7 +30,9 @@ github:
 lark:
   app_id_env: "LARK_APP_ID"
   app_secret_env: "LARK_APP_SECRET"
-  project_id: "example-project-id"
+  # Optional: restrict collected tasks to one Lark tasklist. Leave empty to
+  # collect every tasklist visible to the app.
+  tasklist_id: "example-tasklist-guid"
   chat_id: "oc_example_chat_id"
   webhook_url_env: "LARK_WEBHOOK_URL"
   keywords:

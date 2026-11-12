@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Mapping, Sequence
-from datetime import date, datetime, time as dt_time, timezone
+from datetime import date, datetime, timedelta, time as dt_time, timezone
 import os
 import smtplib
 import socket
@@ -191,7 +191,7 @@ def _collect_all(
 
     collectors = (
         (SOURCE_GITHUB, _collect_github, lambda: _github_params(config, since, until)),
-        (SOURCE_LARK_TASK, _collect_lark_task, lambda: _lark_params(config, since, until, "project_id")),
+        (SOURCE_LARK_TASK, _collect_lark_task, lambda: _lark_params(config, since, until, "tasklist_id", require_id=False)),
         (SOURCE_LARK_MSG, _collect_lark_msg, lambda: _lark_params(config, since, until, "chat_id")),
     )
 
@@ -286,14 +286,15 @@ def _lark_params(
     since: datetime,
     until: datetime,
     id_field: str,
+    *,
+    require_id: bool = True,
 ) -> dict[str, Any]:
     section = config["lark"]
     identifier = section.get(id_field)
-    if not identifier:
+    if require_id and not identifier:
         raise ConfigurationError(f"lark.{id_field} is required")
 
-    return {
-        id_field: str(identifier),
+    params: dict[str, Any] = {
         "app_id": _env(section, "app_id_env", "LARK_APP_ID", required=True),
         "app_secret": _env(section, "app_secret_env", "LARK_APP_SECRET", required=True),
         "keywords": list(section.get("keywords", [])),
@@ -303,6 +304,9 @@ def _lark_params(
         "base_url": str(section.get("base_url", "https://open.feishu.cn")),
         "retry_interval": float(section.get("retry_interval", 5)),
     }
+    if identifier:
+        params[id_field] = str(identifier)
+    return params
 
 
 def _email_target(config: AppConfig) -> dict[str, Any] | None:
@@ -463,24 +467,44 @@ def _timezone(config: AppConfig) -> ZoneInfo:
 
 
 def _collection_window(report_date: date, config: AppConfig) -> tuple[datetime, datetime]:
+    """Return a rolling 24 hour window ending at the report cut-off time."""
     tz = _timezone(config)
-    start = datetime.combine(report_date, dt_time.min, tzinfo=tz)
     now = datetime.now(tz)
-    if report_date == now.date():
-        return start, now
-    if report_date < now.date():
-        return start, datetime.combine(report_date, dt_time(23, 59, 59), tzinfo=tz)
-    return start, start
+    if report_date >= now.date():
+        end = now
+    else:
+        end = datetime.combine(report_date, dt_time(23, 59, 59), tzinfo=tz)
+    return end - timedelta(hours=24), end
 
 
 def _is_working_day(report_date: date, config: AppConfig) -> bool:
+    """Decide whether a report should run for the given date.
+
+    ``schedule.holidays`` / ``schedule.workdays`` act as manual overrides so an
+    organisation can correct the calendar; otherwise the Chinese holiday
+    calendar library decides, falling back to weekday detection when the
+    library has no data for that year.
+    """
     schedule = config.get("schedule") or {}
     if not isinstance(schedule, Mapping):
         schedule = {}
-    if bool(schedule.get("skip_weekends", True)) and report_date.weekday() >= 5:
+
+    iso = report_date.isoformat()
+    if iso in {str(item) for item in schedule.get("workdays", [])}:
+        return True
+    if iso in {str(item) for item in schedule.get("holidays", [])}:
         return False
-    holidays = {str(item) for item in schedule.get("holidays", [])}
-    return report_date.isoformat() not in holidays
+
+    try:
+        import chinese_calendar
+
+        return bool(chinese_calendar.is_workday(report_date))
+    except Exception:
+        configure_logging().warning(
+            "Holiday calendar unavailable; falling back to weekday detection",
+            extra=log_extra(report_date=iso),
+        )
+        return not (bool(schedule.get("skip_weekends", True)) and report_date.weekday() >= 5)
 
 
 def _member_keys(member: Mapping[str, Any]) -> set[str]:

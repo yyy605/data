@@ -24,8 +24,12 @@ class TaskRecord:
 
 
 def collect(params: Mapping[str, Any]) -> list[TaskRecord]:
-    """Collect project tasks changed within the requested time range."""
-    project_id = _required_text(params, "project_id")
+    """Collect Lark tasks updated within the requested time range.
+
+    The Lark Task v2 list endpoint has no server-side time filter, so the
+    collection window is applied locally against each task's ``updated_at``.
+    """
+    tasklist_id = _optional_text(params, "tasklist_id")
     app_id = _required_text(params, "app_id")
     app_secret = _required_text(params, "app_secret")
 
@@ -40,22 +44,20 @@ def collect(params: Mapping[str, Any]) -> list[TaskRecord]:
             http_client, base_url, app_id, app_secret, retry_interval
         )
         headers = {"Authorization": f"Bearer {tenant_token}", "Content-Type": "application/json"}
-        tasks_url = str(params.get("tasks_url", f"{base_url}/open-apis/project/v2/tasks"))
+        tasks_url = str(params.get("tasks_url", f"{base_url}/open-apis/task/v2/tasks"))
 
+        since = _parse_optional_datetime(params.get("since"))
+        until = _parse_optional_datetime(params.get("until"))
         records: list[TaskRecord] = []
         page_token: str | None = None
 
         while True:
-            request_params = {
-                "project_id": project_id,
-                "page_size": int(params.get("page_size", 100)),
+            request_params: dict[str, Any] = {
+                "page_size": int(params.get("page_size", 50)),
+                "user_id_type": "open_id",
             }
             if page_token:
                 request_params["page_token"] = page_token
-            if params.get("since"):
-                request_params["updated_since"] = _format_api_datetime(params["since"])
-            if params.get("until"):
-                request_params["updated_until"] = _format_api_datetime(params["until"])
 
             response = _request_with_token_refresh(
                 http_client,
@@ -81,7 +83,15 @@ def collect(params: Mapping[str, Any]) -> list[TaskRecord]:
             if not isinstance(items, list):
                 raise CollectorError("Lark task response items must be a list")
 
-            records.extend(_to_task_record(item, project_id) for item in items if isinstance(item, Mapping))
+            for item in items:
+                if not isinstance(item, Mapping):
+                    continue
+                if tasklist_id and tasklist_id not in _tasklist_ids(item):
+                    continue
+                record = _to_task_record(item)
+                if not _within_window(record.updated_at, since, until):
+                    continue
+                records.append(record)
 
             page_token = data.get("page_token") or data.get("next_page_token")
             has_more = data.get("has_more")
@@ -94,7 +104,7 @@ def collect(params: Mapping[str, Any]) -> list[TaskRecord]:
         configure_logging().error(
             "Lark task collection failed",
             exc_info=True,
-            extra=log_extra(source="lark_task", project_id=project_id, error=str(exc)),
+            extra=log_extra(source="lark_task", tasklist_id=tasklist_id, error=str(exc)),
         )
         return []
     finally:
@@ -215,42 +225,111 @@ def _token_expired(response: httpx.Response) -> bool:
     )
 
 
-def _to_task_record(payload: Mapping[str, Any], project_id: str) -> TaskRecord:
-    task_id = payload.get("task_id") or payload.get("id") or payload.get("task_guid")
-    title = payload.get("title") or payload.get("summary") or payload.get("name")
-    status = payload.get("status") or payload.get("status_name")
-    if isinstance(status, Mapping):
-        status = status.get("name") or status.get("key") or status.get("code")
+def _to_task_record(payload: Mapping[str, Any]) -> TaskRecord:
+    task_id = payload.get("id") or payload.get("guid") or payload.get("task_id") or payload.get("task_guid")
+    title = payload.get("summary") or payload.get("title") or payload.get("name")
 
-    assignee_data = payload.get("assignee") or payload.get("owner") or payload.get("owners") or []
-    if isinstance(assignee_data, Mapping):
-        assignee = assignee_data.get("name") or assignee_data.get("display_name") or assignee_data.get("user_id") or assignee_data.get("id")
-    elif isinstance(assignee_data, list):
-        assignee = ", ".join(
-            str(item.get("name") or item.get("display_name") or item.get("user_id"),)
-            for item in assignee_data
-            if isinstance(item, Mapping)
-        )
-    else:
-        assignee = assignee_data
+    status = _task_status(payload)
+    assignee = _task_assignee(payload)
 
     updated_value = (
         payload.get("updated_at")
         or payload.get("update_time")
         or payload.get("updated_time")
         or payload.get("modified_at")
+        or payload.get("created_at")
     )
 
-    if not task_id or not title or status is None or assignee is None or updated_value is None:
-        raise ValueError(f"Incomplete Lark task payload for project {project_id}")
+    if not task_id or not title or updated_value is None:
+        raise ValueError(f"Incomplete Lark task payload: {task_id or '<no id>'}")
 
     return TaskRecord(
         task_id=str(task_id),
         title=str(title),
-        status=str(status),
-        assignee=str(assignee),
+        status=status,
+        assignee=assignee,
         updated_at=_parse_datetime(updated_value),
     )
+
+
+def _task_status(payload: Mapping[str, Any]) -> str:
+    status = payload.get("status") or payload.get("status_name")
+    if isinstance(status, Mapping):
+        status = status.get("name") or status.get("key") or status.get("code")
+    if status not in (None, ""):
+        return str(status)
+
+    # Task v2 has no status string; completion is expressed by completed_at.
+    completed_at = payload.get("completed_at")
+    if completed_at in (None, "", "0", 0):
+        return "进行中"
+    return "已完成"
+
+
+def _task_assignee(payload: Mapping[str, Any]) -> str:
+    members = payload.get("members")
+    if isinstance(members, list):
+        names = [
+            str(member.get("name") or member.get("display_name") or member.get("id") or "")
+            for member in members
+            if isinstance(member, Mapping)
+            and str(member.get("role", "assignee")) in ("assignee", "owner", "assignee_and_owner")
+        ]
+        names = [name for name in names if name]
+        if names:
+            return ", ".join(names)
+
+    assignee_data = payload.get("assignee") or payload.get("owner") or payload.get("owners")
+    if isinstance(assignee_data, Mapping):
+        return str(
+            assignee_data.get("name")
+            or assignee_data.get("display_name")
+            or assignee_data.get("id")
+            or assignee_data.get("user_id")
+            or ""
+        )
+    if isinstance(assignee_data, list):
+        names = [
+            str(item.get("name") or item.get("display_name") or item.get("id") or "")
+            for item in assignee_data
+            if isinstance(item, Mapping)
+        ]
+        return ", ".join(name for name in names if name)
+    if assignee_data:
+        return str(assignee_data)
+    return "未指派"
+
+
+def _tasklist_ids(payload: Mapping[str, Any]) -> set[str]:
+    tasklists = payload.get("tasklists")
+    if not isinstance(tasklists, list):
+        return set()
+    return {
+        str(item.get("tasklist_guid") or item.get("id") or item.get("guid"))
+        for item in tasklists
+        if isinstance(item, Mapping)
+    }
+
+
+def _optional_text(params: Mapping[str, Any], key: str) -> str | None:
+    value = params.get(key)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _parse_optional_datetime(value: Any) -> datetime | None:
+    if value in (None, ""):
+        return None
+    return _parse_datetime(value)
+
+
+def _within_window(value: datetime, since: datetime | None, until: datetime | None) -> bool:
+    if since is not None and value < since:
+        return False
+    if until is not None and value > until:
+        return False
+    return True
 
 
 def _required_text(params: Mapping[str, Any], key: str) -> str:
@@ -258,12 +337,6 @@ def _required_text(params: Mapping[str, Any], key: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise CollectorError(f"Missing required Lark parameter: {key}")
     return value.strip()
-
-
-def _format_api_datetime(value: Any) -> str:
-    if isinstance(value, datetime):
-        return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-    return str(value)
 
 
 def _parse_datetime(value: Any) -> datetime:

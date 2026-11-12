@@ -132,3 +132,20 @@ def test_collect_retries_rate_limit_using_reset(mock_sleep):
 
     assert records == []
     assert mock_sleep.call_count == 1
+
+
+@patch("collector.github.time.sleep")
+def test_collect_fails_fast_on_permission_403(mock_sleep):
+    """A 403 caused by missing repository permission must not be retried as a rate limit."""
+    client = SequenceClient([
+        response(403, {"message": "Must have admin rights to Repository."}, {"X-RateLimit-Remaining": "42"}),
+    ])
+
+    records = collect({
+        "repositories": [{"owner": "example-org", "name": "repo"}],
+        "client": client,
+    })
+
+    assert records == []
+    assert mock_sleep.call_count == 0
+    assert len(client.requests) == 1

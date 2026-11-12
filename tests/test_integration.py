@@ -43,7 +43,7 @@ github:
 lark:
   app_id_env: "LARK_APP_ID"
   app_secret_env: "LARK_APP_SECRET"
-  project_id: "example-project-id"
+  tasklist_id: "tl-example"
   chat_id: "oc_example_chat_id"
   webhook_url_env: "LARK_WEBHOOK_URL"
   keywords:

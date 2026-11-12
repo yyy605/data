@@ -15,10 +15,10 @@
 依赖：无
 
 验收标准：
-- [ ] 目录结构符合 design.md §2 的模块划分（collector/、generator/、notifier/、shared/、tests/）
-- [ ] pyproject.toml 包含 httpx、pyyaml、jinja2 依赖
-- [ ] uv sync 成功安装所有依赖
-- [ ] config.yaml.example 包含 members 映射表模板
+- [x] 目录结构符合 design.md §2 的模块划分（collector/、generator/、notifier/、shared/、tests/）
+- [x] pyproject.toml 包含 httpx、pyyaml、jinja2 依赖
+- [x] uv sync 成功安装所有依赖
+- [x] config.yaml.example 包含 members 映射表模板
 
 ---
 
@@ -30,12 +30,12 @@
 依赖：Task 1
 
 验收标准：
-- [ ] config.py 能读取 config.yaml 并返回配置对象
-- [ ] config.py 在配置缺少必填字段时抛出明确的错误信息
-- [ ] logger.py 输出 JSON lines 格式日志
-- [ ] errors.py 定义 CollectorError、GeneratorError、NotifierError 三个自定义异常
-- [ ] storage.py 能创建SQLite，写入和查询日报记录
-- [ ] 所有模块包含对应的单元测试，测试通过
+- [x] config.py 能读取 config.yaml 并返回配置对象
+- [x] config.py 在配置缺少必填字段时抛出明确的错误信息
+- [x] logger.py 输出 JSON lines 格式日志
+- [x] errors.py 定义 CollectorError、GeneratorError、NotifierError 三个自定义异常
+- [x] storage.py 能创建SQLite，写入和查询日报记录
+- [x] 所有模块包含对应的单元测试，测试通过
 
 ---
 
@@ -47,12 +47,12 @@
 依赖：Task 2
 
 验收标准：
-- [ ] collect() 函数签名符合 design.md §4.1 的接口定义
-- [ ] 返回的每个CommitRecord包含全部7个字段且类型正确
-- [ ] 支持分页查询（GitHub API默认每页30条）
-- [ ] API超时重试3次（间隔5s），若仍失败则返回空列表 + 错误日志
-- [ ] GitHub API限流（HTTP 403）时，等待reset时间后重试
-- [ ] 使用Mock数据的单元测试全部通过
+- [x] collect() 函数签名符合 design.md §4.1 的接口定义
+- [x] 返回的每个CommitRecord包含全部7个字段且类型正确
+- [x] 支持分页查询（GitHub API默认每页30条）
+- [x] API超时重试3次（间隔5s），若仍失败则返回空列表 + 错误日志
+- [x] GitHub API限流（HTTP 403）时，等待reset时间后重试
+- [x] 使用Mock数据的单元测试全部通过
 
 ---
 
@@ -64,11 +64,11 @@
 依赖：Task 2
 
 验收标准：
-- [ ] collect() 函数签名符合 design.md §4.1 的接口定义
-- [ ] 返回的每个TaskRecord包含全部5个字段且类型正确
-- [ ] 飞书Token过期时自动刷新后重试1次
-- [ ] API超时重试3次，若仍失败则返回空列表 + 错误日志
-- [ ] 使用Mock数据的单元测试全部通过
+- [x] collect() 函数签名符合 design.md §4.1 的接口定义
+- [x] 返回的每个TaskRecord包含全部5个字段且类型正确
+- [x] 飞书Token过期时自动刷新后重试1次
+- [x] API超时重试3次，若仍失败则返回空列表 + 错误日志
+- [x] 使用Mock数据的单元测试全部通过
 
 ---
 
@@ -80,12 +80,12 @@
 依赖：Task 2
 
 验收标准：
-- [ ] collect() 函数签名符合 design.md §4.1 的接口定义
-- [ ] 返回的每个MessageRecord包含全部4个字段且类型正确
-- [ ] 关键词过滤正确，只返回包含指定关键词的消息
-- [ ] 敏感关键词（薪资、绩效等）被正确过滤，不出现在结果中
-- [ ] 飞书Token过期时自动刷新后重试1次
-- [ ] 使用Mock数据的单元测试全部通过
+- [x] collect() 函数签名符合 design.md §4.1 的接口定义
+- [x] 返回的每个MessageRecord包含全部4个字段且类型正确
+- [x] 关键词过滤正确，只返回包含指定关键词的消息
+- [x] 敏感关键词（薪资、绩效等）被正确过滤，不出现在结果中
+- [x] 飞书Token过期时自动刷新后重试1次
+- [x] 使用Mock数据的单元测试全部通过
 
 ---
 
@@ -97,13 +97,13 @@
 依赖：Task 2
 
 验收标准：
-- [ ] generate() 函数签名符合 design.md §4.2 的接口定义
-- [ ] 输出的DailyReport.markdown包含三个部分标题
-- [ ] 输出的DailyReport.html可被浏览器正确渲染
-- [ ] 若某成员当日无任何记录，日报中需要显示“今日无记录”
-- [ ] 若某数据源采集失败，日报中需要标注“数据获取失败”
-- [ ] Markdown到HTML的转换格式正确
-- [ ] 使用Mock数据的单元测试全部通过
+- [x] generate() 函数签名符合 design.md §4.2 的接口定义
+- [x] 输出的DailyReport.markdown包含三个部分标题
+- [x] 输出的DailyReport.html可被浏览器正确渲染
+- [x] 若某成员当日无任何记录，日报中需要显示“今日无记录”
+- [x] 若某数据源采集失败，日报中需要标注“数据获取失败”
+- [x] Markdown到HTML的转换格式正确
+- [x] 使用Mock数据的单元测试全部通过
 
 ---
 
@@ -115,11 +115,11 @@
 依赖：Task 6
 
 验收标准：
-- [ ] send() 函数签名符合 design.md §4.3 的接口定义
-- [ ] 邮件主题包含日期和团队名称
-- [ ] 邮件正文为HTML格式的日报内容
-- [ ] 发送失败时重试2次，仍失败则返回False + 错误日志
-- [ ] 使用Mock SMTP的单元测试通过
+- [x] send() 函数签名符合 design.md §4.3 的接口定义
+- [x] 邮件主题包含日期和团队名称
+- [x] 邮件正文为HTML格式的日报内容
+- [x] 发送失败时重试2次，仍失败则返回False + 错误日志
+- [x] 使用Mock SMTP的单元测试通过
 
 ---
 
@@ -131,10 +131,10 @@
 依赖：Task 6
 
 验收标准：
-- [ ] send() 函数签名符合 design.md §4.3 的接口定义
-- [ ] 发送的消息为Markdown格式
-- [ ] 发送失败时重试2次，仍失败则返回False + 错误日志
-- [ ] 使用Mock webhook的单元测试通过
+- [x] send() 函数签名符合 design.md §4.3 的接口定义
+- [x] 发送的消息为Markdown格式
+- [x] 发送失败时重试2次，仍失败则返回False + 错误日志
+- [x] 使用Mock webhook的单元测试通过
 
 ---
 
@@ -146,12 +146,12 @@
 依赖：Task 3、Task 4、Task 5、Task 6、Task 7、Task 8
 
 验收标准：
-- [ ] python main.py 执行完整的日报生成流程
-- [ ] python main.py --check 验证所有API连接和配置
-- [ ] python main.py --dry-run 执行采集和生成但不推送
-- [ ] 若单个数据源失败，不应影响其他数据源的采集
-- [ ] 若所有数据源失败，不生成空日报，记录错误日志
-- [ ] 执行日志包含：开始时间、各数据源数据采集条数、推送结果、结束时间
+- [x] python main.py 执行完整的日报生成流程
+- [x] python main.py --check 验证所有API连接和配置
+- [x] python main.py --dry-run 执行采集和生成但不推送
+- [x] 若单个数据源失败，不应影响其他数据源的采集
+- [x] 若所有数据源失败，不生成空日报，记录错误日志
+- [x] 执行日志包含：开始时间、各数据源数据采集条数、推送结果、结束时间
 
 ---
 
@@ -163,11 +163,11 @@
 依赖：Task 9
 
 验收标准：
-- [ ] 正常场景：所有数据源可用，日报生成并推送成功
-- [ ] 降级场景：若某个数据源超时，日报中需要标注“数据获取失败”，其他部分正常
-- [ ] 空数据场景：若某成员当日无任何记录，日报中需要显示“今日无记录”
-- [ ] 全部失败场景：若所有数据源不可用，不生成日报，记录错误日志
-- [ ] 执行耗时少于60s（Mock环境下）
+- [x] 正常场景：所有数据源可用，日报生成并推送成功
+- [x] 降级场景：若某个数据源超时，日报中需要标注“数据获取失败”，其他部分正常
+- [x] 空数据场景：若某成员当日无任何记录，日报中需要显示“今日无记录”
+- [x] 全部失败场景：若所有数据源不可用，不生成日报，记录错误日志
+- [x] 执行耗时少于60s（Mock环境下）
 
 ---
 
@@ -180,3 +180,25 @@
 阶段 5：Task 7+Task 8 并行（两个推送模块）
 阶段 6：Task 9（主编排入口）
 阶段 7：Task 10（集成测试）
+
+---
+
+## 验证状态说明
+
+### 已自动化验证
+- 全部单元测试与集成测试通过（`pytest`，57 个用例）
+- GitHub Commit 采集、飞书消息采集、飞书 Token 获取端点经真实 API 探测确认存在
+- 飞书任务采集使用 Task v2 接口（`/open-apis/task/v2/tasks`），真实 API 返回鉴权错误而非 404，路径有效
+- Docker 镜像构建成功，容器内 CLI 与 cron 调度均验证通过
+
+### 需真实凭据才能端到端验证
+以下链路代码已完成且单测覆盖，但需要真实账号方能确认最终效果：
+- 私有 GitHub 仓库的 Commit 与变更统计采集
+- 飞书任务与群消息的实际数据拉取
+- SMTP 邮件投递
+- 飞书机器人 webhook 推送
+- 5 人团队真实耗时（当前以 Mock 数据验证 < 60s）
+
+### 口径说明
+- 采集窗口采用**滚动 24 小时**：结束时间为执行时刻，或指定历史日期的当日 23:59:59，起点为终点前 24 小时
+- 法定节假日与调休由 `chinesecalendar` 库自动识别，`schedule.holidays` / `schedule.workdays` 可手工覆盖特例
