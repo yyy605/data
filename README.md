@@ -94,6 +94,83 @@ docker compose run --rm daily-report .venv/bin/python main.py --dry-run
 0 18 * * 1-5 cd /opt/smart-daily-report && .venv/bin/python main.py >> logs/daily-report.log 2>&1
 ```
 
+### Windows + WSL2 部署
+
+Windows 上通过 WSL2 运行 Docker Engine（无需 Docker Desktop）：
+
+```powershell
+# 1. 启用 WSL2 功能（管理员），然后重启
+dism /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
+dism /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+
+# 2. 安装 Ubuntu（离线镜像亦可：wsl --install --from-file xxx.wsl --name Ubuntu-24.04）
+wsl --install -d Ubuntu
+```
+
+在 Ubuntu 内安装 Docker Engine 并启用 systemd：
+
+```bash
+# 换用清华源（国内网络）
+sudo sed -i 's#http://archive.ubuntu.com/ubuntu#https://mirrors.tuna.tsinghua.edu.cn/ubuntu#g' /etc/apt/sources.list.d/ubuntu.sources
+sudo apt-get update
+
+sudo apt-get install -y ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu/gpg \
+  | sudo tee /etc/apt/keyrings/docker.asc > /dev/null
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu noble stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker $USER
+
+# 启用 systemd（否则 systemctl 不可用）
+printf '\n[boot]\nsystemd=true\n' | sudo tee -a /etc/wsl.conf
+```
+
+回到 Windows 执行 `wsl --shutdown`，重新进入 Ubuntu 后：
+
+```bash
+sudo systemctl enable --now docker
+docker run --rm hello-world
+```
+
+WSL2 内建议把项目放在 `~/` 而非 `/mnt/d/`（跨文件系统构建明显更慢）：
+
+```bash
+cp -r "/mnt/d/Smart Daily Report Generator" ~/smart-daily-report
+cd ~/smart-daily-report && docker compose up -d --build
+```
+
+若 `docker pull` 访问 Docker Hub 失败，配置国内镜像加速器 `/etc/docker/daemon.json`：
+
+```json
+{
+  "registry-mirrors": [
+    "https://docker.m.daocloud.io",
+    "https://docker.1ms.run",
+    "https://hub.rat.dev"
+  ]
+}
+```
+
+然后 `sudo systemctl restart docker`。
+
+### 容器内常用命令
+
+```bash
+# 单次执行（不推送）
+docker compose run --rm daily-report python main.py --dry-run
+
+# 校验配置与连通性
+docker compose run --rm daily-report python main.py --check
+
+# 立即生成一次（跳过非工作日限制）
+docker compose run --rm daily-report python main.py --force
+```
+
 ## 非功能约束
 
 - **日志**：JSON Lines 格式，包含开始/结束时间、各数据源条数、推送结果

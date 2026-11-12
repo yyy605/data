@@ -1,8 +1,14 @@
+#!/bin/sh
 # Entrypoint for the cron-driven daily report container.
 #
 #   docker run ... <image>                     -> start the cron scheduler
 #   docker run ... <image> python main.py ...  -> run a one-off command
 set -eu
+
+# Prefer the project virtualenv so `python` resolves to the interpreter that
+# actually has the runtime dependencies installed.
+PATH="/app/.venv/bin:$PATH"
+export PATH
 
 if [ "$#" -gt 0 ] && [ "$1" != "scheduler" ]; then
     exec "$@"
