@@ -192,6 +192,21 @@ def test_collect_refreshes_expired_token_once():
     assert client.requests[-1][2]["Authorization"] == "Bearer fresh-token"
 
 
+def test_collect_does_not_refresh_token_on_permission_error():
+    """99991672 is a missing-scope error; refreshing the token cannot fix it."""
+    denied = {
+        "code": 99991672,
+        "msg": "Access denied. One of the following scopes is required: [task:task:read]",
+    }
+    client = TaskClient([make_response(status=400, json_data=denied)])
+
+    records = collect(base_params(client))
+
+    assert records == []
+    # Exactly one request: no token refresh round-trip was attempted.
+    assert len(client.requests) == 1
+
+
 def test_collect_retries_timeout_three_times_and_returns_empty(monkeypatch):
     client = TaskClient([
         httpx.ReadTimeout("timeout"),

@@ -72,6 +72,48 @@ def test_markdown_to_html_formats_headings_lists_and_bold_text():
     )
 
 
+def test_commit_message_is_collapsed_to_single_line():
+    report = generate([{
+        "name": "张三",
+        "commits": [{
+            "sha": "abcdef1234567890",
+            "repository": "o/r",
+            "message": "feat: 新增功能\n\n- 详细说明一\n- 详细说明二\n\nCo-authored-by: X <x@y.z>",
+            "author": "zhangsan",
+            "additions": 3,
+            "deletions": 1,
+        }],
+    }], "2026-11-06", "研发团队")
+
+    commit_lines = [
+        line for line in report.markdown.splitlines()
+        if line.startswith("- `abcdef1`")
+    ]
+    assert len(commit_lines) == 1
+    assert "feat: 新增功能" in commit_lines[0]
+    assert "详细说明一" not in report.markdown
+    assert "Co-authored-by" not in report.markdown
+
+
+def test_long_commit_subject_is_truncated():
+    long_subject = "x" * 200
+    report = generate([{
+        "name": "张三",
+        "commits": [{
+            "sha": "abcdef1234567890",
+            "repository": "o/r",
+            "message": long_subject,
+            "author": "zhangsan",
+            "additions": 0,
+            "deletions": 0,
+        }],
+    }], "2026-11-06", "研发团队")
+
+    bullet = next(line for line in report.markdown.splitlines() if line.startswith("- `abcdef1`"))
+    assert "x" * 200 not in bullet
+    assert "…" in bullet
+
+
 def test_generate_accepts_member_report_objects():
     report = generate([
         MemberReport(name="赵六", commits=[], tasks=[], messages=[])

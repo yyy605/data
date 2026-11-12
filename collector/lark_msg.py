@@ -212,7 +212,7 @@ def _token_expired(response: httpx.Response) -> bool:
         payload = response.json()
     except ValueError:
         return False
-    return payload.get("code") in (99991663, 99991664, 99991668, 99991672)
+    return payload.get("code") in (99991663, 99991664, 99991668)
 
 
 def _to_message_record(payload: Mapping[str, Any]) -> MessageRecord:

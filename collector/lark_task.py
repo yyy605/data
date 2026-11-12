@@ -217,11 +217,12 @@ def _token_expired(response: httpx.Response) -> bool:
         payload = response.json()
     except ValueError:
         return False
+    # 99991672 means "access denied / scope not granted"; refreshing the token
+    # cannot fix it, so it must surface as a plain API error instead.
     return payload.get("code") in (
         99991663,
         99991664,
         99991668,
-        99991672,
     )
 
 

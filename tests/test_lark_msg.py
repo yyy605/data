@@ -137,3 +137,16 @@ def test_collect_retries_timeout_three_times_and_returns_empty():
 
     assert records == []
     assert len(client.requests) == 3
+
+
+def test_collect_does_not_refresh_token_on_permission_error():
+    denied = {
+        "code": 99991672,
+        "msg": "Access denied. One of the following scopes is required: [im:message]",
+    }
+    client = MessageClient([make_response(status=400, json_data=denied)])
+
+    records = collect(base_params(client))
+
+    assert records == []
+    assert len(client.requests) == 1

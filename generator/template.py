@@ -134,7 +134,20 @@ def _render_commit(commit: Any) -> str:
     identity = f"`{sha}` " if sha else ""
     author_suffix = f" — {author}" if author else ""
     repository_suffix = f"（{repository}）" if repository else ""
-    return f"- {identity}{message}{author_suffix}{repository_suffix}；+{additions}/-{deletions}"
+    return f"- {identity}{_commit_subject(message)}{author_suffix}{repository_suffix}；+{additions}/-{deletions}"
+
+
+def _commit_subject(message: Any, limit: int = 120) -> str:
+    """Collapse a multi-line commit message to a single-line bullet.
+
+    Commit bodies often contain their own Markdown (indented lists, blank
+    lines); rendering them verbatim breaks the report structure.
+    """
+    lines = [line.strip() for line in str(message).splitlines() if line.strip()]
+    subject = lines[0] if lines else ""
+    if len(subject) > limit:
+        subject = subject[: limit - 1].rstrip() + "…"
+    return subject
 
 
 def _render_task(task: Any) -> str:
