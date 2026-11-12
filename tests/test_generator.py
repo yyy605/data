@@ -114,6 +114,27 @@ def test_long_commit_subject_is_truncated():
     assert "…" in bullet
 
 
+def test_html_is_rendered_from_jinja2_template():
+    from generator.template import HTML_TEMPLATE, TEMPLATE_DIR
+
+    assert (TEMPLATE_DIR / HTML_TEMPLATE).is_file()
+
+    report = generate([{"name": "张三"}], "2026-11-06", "研发团队")
+
+    assert report.html.lower().startswith("<!doctype html>")
+    assert "<title>研发团队 2026-11-06 日报</title>" in report.html
+    assert "{{" not in report.html
+
+
+def test_html_title_is_escaped_but_body_keeps_markup():
+    report = generate([{"name": "张三"}], "2026-11-06", "<script>alert(1)</script>")
+
+    head, _, body = report.html.partition("<body>")
+    assert "<script>" not in head
+    assert "&lt;script&gt;" in head
+    assert "<h2>张三</h2>" in body
+
+
 def test_generate_accepts_member_report_objects():
     report = generate([
         MemberReport(name="赵六", commits=[], tasks=[], messages=[])

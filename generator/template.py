@@ -4,11 +4,24 @@ from __future__ import annotations
 
 from datetime import datetime
 from html import escape
+from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any
 
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
 if TYPE_CHECKING:
     from .formatter import DailyReport, MemberReport
+
+TEMPLATE_DIR = Path(__file__).parent / "templates"
+HTML_TEMPLATE = "report.html.jinja2"
+
+_env = Environment(
+    loader=FileSystemLoader(TEMPLATE_DIR),
+    autoescape=select_autoescape(("html", "jinja2")),
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
 
 SOURCE_LABELS = {
     "github": "GitHub",
@@ -54,18 +67,14 @@ def render_markdown(report: DailyReport) -> str:
 
 
 def render_html(report: DailyReport) -> str:
+    """Render the HTML report from the Jinja2 template.
+
+    The body is already trusted HTML produced by :func:`markdown_to_html`, so it
+    is marked safe; the title goes through Jinja2 autoescaping.
+    """
     body = markdown_to_html(report.markdown)
-    return (
-        '<!doctype html>\n<html lang="zh-CN">\n<head>\n'
-        '<meta charset="utf-8">\n'
-        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        f"<title>{escape(f'{report.team} {report.date} 日报')}</title>\n"
-        "<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;"
-        "max-width:900px;margin:2rem auto;padding:0 1rem;color:#24292f;line-height:1.6}"
-        "h1{border-bottom:1px solid #d8dee4;padding-bottom:.3em}"
-        "h2{margin-top:2rem}h3{color:#57606a}li{margin:.25rem 0}</style>\n"
-        "</head>\n<body>\n" + body + "\n</body>\n</html>\n"
-    )
+    template = _env.get_template(HTML_TEMPLATE)
+    return template.render(title=f"{report.team} {report.date} 日报", body=body)
 
 
 def markdown_to_html(markdown: str) -> str:
