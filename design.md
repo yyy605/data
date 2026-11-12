@@ -22,6 +22,7 @@
 ## 5．技术选型（ADR）
 - ADR-001: HTTP 客户端 → httpx
 - ADR-002: 数据存储 → SQLite
+- 完整决策记录（含备选方案、代价、重新评估条件）见 [DECISIONS.md](./DECISIONS.md)
 
 ## 6．非功能性约束
 - 错误处理：优雅降级策略
