@@ -3,8 +3,9 @@
 自动从 GitHub、飞书任务与飞书群消息中采集团队当日工作数据，生成结构化日报（Markdown + HTML），并通过邮件与飞书机器人推送。
 
 需求与设计见 [proposal.md](./proposal.md)、[design.md](./design.md)、[task.md](./task.md)。
-**技术选型与架构决策的理由见 [DECISIONS.md](./DECISIONS.md)**（21 条 ADR：为什么选 httpx / SQLite / Jinja2，为什么全同步，为什么采集失败不抛异常……）。
+**技术选型与架构决策的理由见 [DECISIONS.md](./DECISIONS.md)**（22 条 ADR：为什么选 httpx / SQLite / Jinja2，为什么全同步，为什么采集失败不抛异常……）。
 测试说明见 [TESTING.md](./TESTING.md)，验收结果见 [ACCEPTANCE.md](./ACCEPTANCE.md)。
+需求澄清与开发过程的完整对话记录见 [PROMPTS.md](./PROMPTS.md)。
 
 ## 功能概览
 
