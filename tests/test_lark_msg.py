@@ -126,6 +126,15 @@ def test_collect_refreshes_expired_token_once():
     assert client.requests[-1][1]["Authorization"] == "Bearer fresh-token"
 
 
+def test_collect_clamps_page_size_to_feishu_limit():
+    """Feishu rejects page_size > 50 on this endpoint with 99992402."""
+    payload = {"code": 0, "data": {"items": [], "has_more": False}}
+    for requested, expected in ((100, 50), (51, 50), (20, 20), (1, 1), (0, 1)):
+        client = MessageClient([make_response(json_data=payload)])
+        collect({**base_params(client), "page_size": requested})
+        assert client.requests[0][2]["page_size"] == expected
+
+
 def test_collect_retries_timeout_three_times_and_returns_empty():
     client = MessageClient([
         httpx.ReadTimeout("timeout"),

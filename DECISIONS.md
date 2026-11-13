@@ -44,6 +44,7 @@
 | ADR-020 | 调度形态 | 容器内 cron，不用 APScheduler 常驻进程 | `docker/entrypoint.sh` |
 | ADR-021 | 容器入口 | 一个脚本双模式（调度 / 一次性命令） | `docker/entrypoint.sh` |
 | ADR-022 | 报告落盘 | 除 SQLite 外，另存 `<日期>.md` / `<日期>.html` 到 `reports/` | `shared/storage.py:export_report_files` |
+| ADR-023 | 分页上限 | 飞书消息 `page_size` 夹在 1–50，超限错误码会掩盖真实原因 | `collector/lark_msg.py:_page_size` |
 
 ---
 
@@ -683,6 +684,42 @@ cron 不继承容器环境变量，因此入口脚本会把 `os.environ` 落盘�
 
 **什么情况下应该重新评估**
 若出现"需要以文件为事实源"的诉求（如用 Git 管理日报历史），应反转方向：改为文件为主、库做索引，并加入一致性校验。
+
+---
+
+## ADR-023 分页参数必须夹在上限内
+
+- **状态**：已采纳
+- **日期**：2026-11-13
+- **代码位置**：`collector/lark_msg.py:_page_size`、`MAX_PAGE_SIZE = 50`
+
+**当时的问题**
+飞书 `GET /open-apis/im/v1/messages` 的 `page_size` 上限是 **50**，而采集器默认传 **100**。实测发现参数超限时飞书返回的是 `99992402 field validation failed`，而不是权限错误——这导致排查方向被彻底带偏。
+
+**实测证据**
+
+```
+page_size=50   → 99991672  Access denied（真实原因：缺 im:message:readonly）
+page_size=51   → 99992402  field validation failed
+page_size=100  → 99992402  field validation failed   ← 采集器当时用的值
+```
+
+**考虑过的方案**
+
+| 方案 | 优点 | 为什么没选 |
+| --- | --- | --- |
+| 只改默认值为 50 | 一行改动 | 调用方显式传 100 时仍会踩坑，且错误信息依旧误导 |
+| 超限时抛异常提示 | 显式 | 运行时才炸，不解决问题 |
+| **取值时夹在 1–50** ✅ | 永不产生超限请求；调用方传什么都不至于误报 | — |
+
+**决定**
+`_page_size()` 对入参做 `max(1, min(requested, 50))`，并把常量与原因写进代码注释。
+
+**代价 / 已知不足**
+若调用方期望"一次取 200 条"，实际只会拿到 50 条——但分页循环会继续翻页，最终结果仍完整，只是请求数变多。
+
+**什么情况下应该重新评估**
+飞书放宽该接口上限时（需重新实测确认，不能凭文档假设）。
 
 ---
 

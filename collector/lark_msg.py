@@ -17,6 +17,11 @@ from shared.logger import configure_logging, log_extra
 
 DEFAULT_SENSITIVE_KEYWORDS = ("薪资", "绩效", "工资", "奖金")
 
+# Feishu rejects page_size > 50 on /open-apis/im/v1/messages with
+# 99992402 "field validation failed", which hides the real cause.
+MAX_PAGE_SIZE = 50
+DEFAULT_PAGE_SIZE = 50
+
 
 @dataclass(frozen=True)
 class MessageRecord:
@@ -51,7 +56,7 @@ def collect(params: Mapping[str, Any]) -> list[MessageRecord]:
             request_params = {
                 "container_id_type": "chat",
                 "container_id": chat_id,
-                "page_size": int(params.get("page_size", 100)),
+                "page_size": _page_size(params),
             }
             if params.get("since"):
                 request_params["start_time"] = _format_api_timestamp(params["since"])
@@ -213,6 +218,15 @@ def _token_expired(response: httpx.Response) -> bool:
     except ValueError:
         return False
     return payload.get("code") in (99991663, 99991664, 99991668)
+
+
+def _page_size(params: Mapping[str, Any]) -> int:
+    """Clamp page_size to the range the Feishu message API accepts."""
+    try:
+        requested = int(params.get("page_size", DEFAULT_PAGE_SIZE))
+    except (TypeError, ValueError):
+        return DEFAULT_PAGE_SIZE
+    return max(1, min(requested, MAX_PAGE_SIZE))
 
 
 def _to_message_record(payload: Mapping[str, Any]) -> MessageRecord:
