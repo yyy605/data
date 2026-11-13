@@ -90,6 +90,7 @@ uv run pytest -q                  # 运行全部测试
 - 同时导出人可读副本：`reports/<日期>.md` 与 `reports/<日期>.html`（目录由 `storage.reports_dir` 配置，默认 `reports`）。两者与数据库同源同次写入，同日重跑覆盖；文件写入失败不会阻断推送
 - 采集窗口为**滚动 24 小时**：结束时间是执行时刻（或 `--date` 指定日期的当日 23:59:59），起点为终点前 24 小时；时区取 `team.timezone`
 - 成员归属通过 `members` 中的 `github_login`、`lark_user_id`、`name`、`email` 映射
+- 生成条件：只要**至少一个**数据源正常返回就会生成日报；仅当三个源全部失败时才不生成并返回 `1`。采集成功但无记录不算失败，对应板块显示「今日无记录」
 - 非工作日跳过：法定节假日与调休由 `chinesecalendar` 库自动识别；`schedule.holidays` / `schedule.workdays` 可手工覆盖个别日期；无需跳过时使用 `--force`
 - 飞书任务采集使用 **Task v2** 接口 `/open-apis/task/v2/tasks`。该接口不支持服务端时间过滤，因此按 `updated_at` 在本地裁剪采集窗口；配置 `lark.tasklist_id` 可只采集指定任务清单（留空表示全部）
 
@@ -103,6 +104,8 @@ docker compose logs -f
 ```
 
 容器内由 cron 按 `CRON_SCHEDULE`（默认 `0 18 * * 1-5`）与 `CRON_TZ`（默认 `Asia/Shanghai`）触发，日志输出到 Docker 标准输出，并配置了每小时一次的健康检查（等价于 `main.py --check`）。
+
+> **注意：`config.yaml` 中的 `schedule.hour` / `schedule.minute` 目前不会被任何代码读取**，修改它们不会改变执行时间。真正生效的只有容器环境变量 `CRON_SCHEDULE`（容器部署）或宿主机 crontab（非容器部署）。这两个键仅为后续"由配置生成调度表达式"预留，保留原样即可。
 
 如需单次执行而非调度：
 
