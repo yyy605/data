@@ -32,7 +32,10 @@ def send(report: Any, target: Mapping[str, Any]) -> bool:
 
     client = target.get("client")
     owns_client = client is None
-    http_client = client or httpx.Client(timeout=float(target.get("timeout", 30)))
+    http_client = client or httpx.Client(
+        timeout=float(target.get("timeout", 30)),
+        verify=target.get("verify", True),
+    )
     retry_interval = float(target.get("retry_interval", 5))
 
     try:

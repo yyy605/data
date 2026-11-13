@@ -47,7 +47,11 @@ def collect(params: Mapping[str, Any]) -> list[CommitRecord]:
     api_base = str(params.get("base_url", "https://api.github.com")).rstrip("/")
     client = params.get("client")
     owns_client = client is None
-    http_client = client or httpx.Client(timeout=float(params.get("timeout", 30)), headers=headers)
+    http_client = client or httpx.Client(
+        timeout=float(params.get("timeout", 30)),
+        headers=headers,
+        verify=params.get("verify", True),
+    )
     sleep_seconds = float(params.get("retry_interval", 5))
 
     try:

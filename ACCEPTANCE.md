@@ -6,8 +6,8 @@
 | 分支 | `main` |
 | 被验收的代码提交 | `28bd845`（验收基线，本报告单独提交） |
 | 验收日期 | 2026-11-13 |
-| 代码规模 | 源码 16 文件 2540 行；测试 11 文件 1565 行 |
-| 自动化测试 | **81 个用例，全部通过** |
+| 代码规模 | 源码 16 文件 2591 行；测试 11 文件 1613 行 |
+| 自动化测试 | **85 个用例，全部通过** |
 
 本报告只记录**实测结果**。无法在当前环境验证的项目均明确标注为「待验证」，不做推测性结论。
 
@@ -81,6 +81,9 @@
 | Cron 定时、无常驻服务 | ✅ 容器内 `/etc/cron.d/daily-report`，`0 18 * * 1-5`，`CRON_TZ=Asia/Shanghai` |
 | 本地 SQLite 存储 | ✅ `data/reports.db`，写入/查询/覆盖更新均有单测；另导出 `reports/<日期>.md` 与 `.html` 副本 |
 | 外部依赖 | ✅ GitHub API、飞书开放平台、SMTP 均实测可达 |
+| TLS 信任可配置 | ✅ `network.ca_bundle` 支持自定义 PEM 合并包，四个 httpx 客户端与 `--check` 共用同一份；`--check` 输出 `ca_bundle` 项 |
+
+> 最后一行不属于 proposal 2.3 的 5 项约束，是为解决本机代理问题补充的验证项。
 
 ---
 
@@ -88,6 +91,7 @@
 
 ```
 config           PASS  configuration loaded
+ca_bundle        PASS  custom: certs/ca-bundle.pem
 environment      PASS  all referenced variables are set
 github           PASS  HTTP 200
 lark             PASS  tenant_access_token acquired
@@ -98,7 +102,7 @@ smtp             PASS  smtp.qq.com:465 reachable
 lark_webhook     PASS  open.feishu.cn reachable
 ```
 
-退出码 `0`。`lark_scope_chat` 在 `lark.chat_id` 已配置时视为可选——该项权限只用于自动发现群 ID。
+退出码 `0`。`lark_scope_chat` 在 `lark.chat_id` 已配置时视为可选——该项权限只用于自动发现群 ID。`ca_bundle` 项显示当前生效的 TLS 信任来源：`default trust store` 表示用 certifi，`custom: <路径>` 表示指向自定义合并包（见第九节第 7 条）。
 
 ---
 
@@ -150,7 +154,7 @@ uv run python main.py --dry-run      # 采集+生成，不推送
 uv run python main.py                # 完整流程
 uv run python main.py --force        # 非工作日也执行（手动立即推送）
 uv run python main.py --date 2026-11-12 --force   # 指定日期补发
-uv run pytest -q                     # 运行测试（81 项）
+uv run pytest -q                     # 运行测试（85 项）
 ```
 
 退出码：`0` 成功（含跳过非工作日、dry-run）；`1` 配置错误、全部数据源失败或推送失败。
@@ -191,6 +195,7 @@ uv run pytest -q                     # 运行测试（81 项）
 4. **只能单向推送，无法从飞书反向触发**：项目内无任何入站 HTTP 代码（无 WebSocket/事件订阅回调），飞书自定义机器人 webhook 本身只能发不能收。要在飞书里"要求它生成日报"，需新增入站通道（事件订阅需公网 HTTPS 地址且回调须 3 秒内响应，与当前"无常驻服务"约束冲突；轮询群消息指令则不需要新权限）。
 5. **`schedule.hour` / `schedule.minute` 不生效**：这两个键无任何生产代码读取（已全文检索确认），真正控制执行时间的是容器环境变量 `CRON_SCHEDULE` 或宿主机 crontab。保留原样，仅作后续"由配置生成调度表达式"的预留。
 6. **`data/` `reports/` 内文件在容器部署下属主为 root**：容器以 root 运行并挂载这两个目录，宿主机用户删除其中文件需 `sudo`。
+7. **本机 TLS 中间人代理会拦截采集**：Watt Toolkit（Steam++）等工具把 `github.com` / `api.github.com` 等 35 个域名写入 hosts 指向 `127.0.0.1`。实测本机报 `SSL: CERTIFICATE_VERIFY_FAILED`（certifi 不信任其根证书），容器内报 `Connection refused`（`127.0.0.1` 指向容器自身）。已通过 `network.ca_bundle` 指定「certifi + 代理根证书」合并包、并在 compose 中设置 `dns` 解决；`certs/` 与机器绑定，已 gitignore，新机器需按 README 重新导出。
 
 ---
 
@@ -202,8 +207,10 @@ uv run pytest -q                     # 运行测试（81 项）
 | --- | --- |
 | 飞书三项应用权限开通、机器人入群 | 功能验收 #2 #3 由「待验证」转为「通过」 |
 | `shared/config.py` 新增 `load_dotenv()`，`main()` 启动时自动加载 `.env` | 手动运行不再需要额外参数；补 3 个单测，用例数 78 → 81 |
+| `shared/config.py` 新增 `ca_bundle()`，四个 httpx 客户端统一支持自定义 CA；compose 增加 `dns` | 修复本机 TLS 中间人代理导致的 GitHub 采集失败；补 4 个单测，用例数 81 → 85 |
 | README 补「手动触发一次日报」「生成条件」说明 | 文档与代码行为对齐 |
 | `DECISIONS.md` 新增 ADR-024（记录自研 `.env` 解析的取舍） | ADR 总数 23 → 24 |
+| `DECISIONS.md` 新增 ADR-025（记录 CA 信任做成配置项的取舍） | ADR 总数 24 → 25 |
 
 ---
 

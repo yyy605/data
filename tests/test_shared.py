@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from shared.config import load_config, load_dotenv
+from shared.config import ca_bundle, load_config, load_dotenv
 from shared.errors import ConfigurationError
 from shared.logger import JsonLineFormatter
 from shared.storage import ReportStorage, export_report_files
@@ -83,6 +83,26 @@ def test_load_dotenv_keeps_existing_environment(tmp_path, monkeypatch):
 
 def test_load_dotenv_ignores_missing_files(tmp_path):
     assert load_dotenv(tmp_path / "nope.env", tmp_path / "also-nope.env") == []
+
+
+def test_ca_bundle_defaults_to_httpx_trust_store():
+    assert ca_bundle({}) is True
+    assert ca_bundle({"network": {"ca_bundle": ""}}) is True
+    assert ca_bundle({"network": {"ca_bundle": "   "}}) is True
+
+
+def test_ca_bundle_returns_configured_path(tmp_path):
+    bundle = tmp_path / "ca-bundle.pem"
+    bundle.write_text("-----BEGIN CERTIFICATE-----\n", encoding="utf-8")
+
+    assert ca_bundle({"network": {"ca_bundle": str(bundle)}}) == str(bundle)
+
+
+def test_ca_bundle_rejects_missing_file(tmp_path):
+    missing = tmp_path / "nope.pem"
+
+    with pytest.raises(ConfigurationError, match="network.ca_bundle file not found"):
+        ca_bundle({"network": {"ca_bundle": str(missing)}})
 
 
 def test_json_log_formatter_outputs_valid_json():

@@ -43,7 +43,10 @@ def collect(params: Mapping[str, Any]) -> list[MessageRecord]:
 
     client = params.get("client")
     owns_client = client is None
-    http_client = client or httpx.Client(timeout=float(params.get("timeout", 30)))
+    http_client = client or httpx.Client(
+        timeout=float(params.get("timeout", 30)),
+        verify=params.get("verify", True),
+    )
     base_url = str(params.get("base_url", "https://open.feishu.cn")).rstrip("/")
     retry_interval = float(params.get("retry_interval", 5))
 

@@ -761,6 +761,48 @@ environment      FAIL  missing: GITHUB_TOKEN, LARK_APP_ID, LARK_APP_SECRET,
 
 ---
 
+## ADR-025 把 CA 信任做成配置项，而不是让用户改代码或关软件
+
+- **状态**：已采纳
+- **日期**：2026-11-13
+- **代码位置**：`shared/config.py:ca_bundle`、`collector/*.py` 的 `verify=params.get("verify", True)`
+
+**当时的问题**
+本机安装了 Watt Toolkit（Steam++）并开启了 GitHub 加速。它把 35 个 GitHub 域名写入 Windows hosts 指向 `127.0.0.1`，由 `Steam++.Accelerator` 在 443 端口做 TLS 卸载。实测后果：
+
+```
+Windows 本机：github  FAIL  SSL: CERTIFICATE_VERIFY_FAILED
+容器内：      github  FAIL  Connection refused
+```
+
+两者原因不同：本机是被 MITM 证书拦下（certifi 不信任 `CN=SteamTools Certificate`），容器里 `127.0.0.1` 指向容器自身所以根本没有监听者。
+
+关键事实：**`api.github.com` 直连本来就是通的**（`--add-host` 绕过 hosts 实测 `HTTP 200`），只有 `github.com` 网页直连超时。也就是说加速器对采集毫无必要，却把采集链路弄断了。
+
+**考虑过的方案**
+
+| 方案 | 优点 | 为什么没选 |
+| --- | --- | --- |
+| 让用户关掉加速器 | 零代码改动 | `github.com` 网页直连不通，用户装它就是为了浏览 |
+| 把真实 IP 写进 hosts | 直接 | 加速器启动会覆盖 hosts；IP 也会变 |
+| 代码里 `verify=False` | 一行 | 关闭全部校验，等于放弃中间人防护 |
+| 硬编码信任某个证书 | 简单 | 证书与机器绑定，不能进仓库 |
+| **配置项 `network.ca_bundle`** ✅ | 与机器解耦；加速器开或关都兼容；容器也能复用同一份文件 | — |
+
+**决定**
+`ca_bundle(config)` 返回 httpx 的 `verify` 取值：未配置时返回 `True`（保持 certifi 默认），配置了路径就校验文件存在并返回该路径。main.py 把它注入每个 params/target 字典，四个 httpx 客户端统一读取 `params.get("verify", True)`。容器侧另加 `dns: ${DOCKER_DNS:-223.5.5.5}`，绕开 Windows hosts 继承。（本次同时把 `github.com`/`api.github.com` 的真实可达性写进了验证记录，便于日后判断该关哪个开关。）
+
+**代价 / 已知不足**
+- `certs/` 必须 gitignore，新机器要重新导出一遍（README 给了 6 行脚本）
+- 只在配置了 `ca_bundle` 时才生效，`--check` 增加一项 `ca_bundle` 便于确认当前走的是默认还是自定义信任库
+- SMTP 未接入该配置（`smtp.qq.com` 不在劫持列表内）；若将来邮件服务器被代理，需要另加 `ssl.SSLContext`
+- 容器改用外部 DNS 后不再遵循企业内网解析，局域网服务名需通过 `DOCKER_DNS` 指定
+
+**什么情况下应该重新评估**
+代理改为系统级（PAC / 全局透明代理）而不依赖 hosts 时，应改用 `SSL_CERT_FILE` 环境变量或把 CA 装入系统信任库，而不是逐客户端传参。
+
+---
+
 ## 附：被否决方案速查
 
 | 方案 | 否决原因 | 相关 ADR |
@@ -775,6 +817,7 @@ environment      FAIL  missing: GITHUB_TOKEN, LARK_APP_ID, LARK_APP_SECRET,
 | 自然日 00:00 窗口 | 跨零点数据丢失 | ADR-019 |
 | APScheduler 常驻 | 违背"无常驻服务"约束 | ADR-020 |
 | 依赖 `python-dotenv` | 一个 20 行解析器不值得加依赖 | ADR-024 |
+| 关闭 TLS 校验以穿过代理 | 等于放弃中间人防护 | ADR-025 |
 
 ---
 

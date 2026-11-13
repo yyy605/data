@@ -9,8 +9,14 @@ services:
     environment:
       CRON_SCHEDULE: "0 18 * * 1-5"
       CRON_TZ: "Asia/Shanghai"
+    # WSL inherits the Windows hosts file through the Windows DNS proxy, so a
+    # hosts-based proxy (e.g. Watt Toolkit rewriting github.com to 127.0.0.1)
+    # makes api.github.com unreachable from the container. Resolve externally.
+    dns:
+      - ${DOCKER_DNS:-223.5.5.5}
     volumes:
       - ./config.yaml:/app/config.yaml:ro
+      - ./certs:/app/certs:ro
       - ./data:/app/data
       - ./reports:/app/reports
     logging:

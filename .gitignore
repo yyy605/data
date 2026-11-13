@@ -13,6 +13,8 @@ desktop.ini
 .env.*
 !.env.example
 config.yaml
+# Machine-specific trust bundles (exported proxy CAs, certifi-derived bundles)
+certs/
 
 # Python
 __pycache__/

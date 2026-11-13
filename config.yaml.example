@@ -2,6 +2,13 @@ team:
   name: "研发团队"
   timezone: "Asia/Shanghai"
 
+network:
+  # Optional. Path to a PEM bundle used for TLS verification. Leave empty to use
+  # certifi's default trust store. Set it when a local TLS-intercepting proxy
+  # (e.g. Watt Toolkit / Steam++ "GitHub accelerator") rewrites the hosts file:
+  # point it at a bundle concatenating certifi's cacert.pem with the proxy's CA.
+  ca_bundle: ""
+
 schedule:
   hour: 18
   minute: 0

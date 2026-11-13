@@ -20,7 +20,7 @@ import httpx
 from collector import github, lark_msg, lark_task
 from generator.formatter import MemberReport, generate
 from notifier import email, lark_bot
-from shared.config import AppConfig, load_config, load_dotenv
+from shared.config import AppConfig, ca_bundle, load_config, load_dotenv
 from shared.errors import ConfigurationError
 from shared.logger import configure_logging, log_extra
 from shared.storage import ReportStorage, export_report_files
@@ -59,6 +59,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         config = load_config(args.config)
+        ca_bundle(config)
     except ConfigurationError as exc:
         logger.error("Configuration invalid", extra=log_extra(error=str(exc)))
         return 1
@@ -162,6 +163,15 @@ def run_checks(config: AppConfig) -> int:
     logger = configure_logging()
     results: list[tuple[str, bool, str]] = []
     results.append(("config", True, "configuration loaded"))
+
+    try:
+        bundle = ca_bundle(config)
+    except ConfigurationError as exc:
+        results.append(("ca_bundle", False, str(exc)))
+    else:
+        results.append(
+            ("ca_bundle", True, "default trust store" if bundle is True else f"custom: {bundle}")
+        )
 
     missing = _missing_environment_variables(config)
     if missing:
@@ -306,6 +316,7 @@ def _github_params(config: AppConfig, since: datetime, until: datetime) -> dict[
         "until": _api_time(until),
         "base_url": str(section.get("base_url", "https://api.github.com")),
         "retry_interval": float(section.get("retry_interval", 5)),
+        "verify": ca_bundle(config),
     }
 
 
@@ -331,6 +342,7 @@ def _lark_params(
         "until": _api_time(until),
         "base_url": str(section.get("base_url", "https://open.feishu.cn")),
         "retry_interval": float(section.get("retry_interval", 5)),
+        "verify": ca_bundle(config),
     }
     if identifier:
         params[id_field] = str(identifier)
@@ -370,7 +382,11 @@ def _lark_bot_target(config: AppConfig) -> dict[str, Any] | None:
         webhook_url = _env(section, "webhook_url_env", "LARK_WEBHOOK_URL", required=True)
     except ConfigurationError:
         return None
-    return {"webhook_url": webhook_url, "retry_interval": float(section.get("retry_interval", 5))}
+    return {
+        "webhook_url": webhook_url,
+        "retry_interval": float(section.get("retry_interval", 5)),
+        "verify": ca_bundle(config),
+    }
 
 
 def _env(section: Mapping[str, Any], key: str, default: str, *, required: bool) -> str | None:
@@ -408,7 +424,7 @@ def _check_github(config: AppConfig) -> tuple[str, bool, str]:
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     base_url = str(section.get("base_url", "https://api.github.com")).rstrip("/")
     try:
-        with httpx.Client(timeout=15, headers=headers) as client:
+        with httpx.Client(timeout=15, headers=headers, verify=ca_bundle(config)) as client:
             response = client.get(f"{base_url}/rate_limit")
     except httpx.HTTPError as exc:
         return ("github", False, f"connection failed: {exc}")
@@ -425,7 +441,7 @@ def _check_lark(config: AppConfig) -> list[tuple[str, bool, str]]:
 
     base_url = str(section.get("base_url", "https://open.feishu.cn")).rstrip("/")
     try:
-        with httpx.Client(timeout=15) as client:
+        with httpx.Client(timeout=15, verify=ca_bundle(config)) as client:
             response = client.post(
                 f"{base_url}/open-apis/auth/v3/tenant_access_token/internal",
                 json={"app_id": app_id, "app_secret": app_secret},
@@ -447,7 +463,7 @@ def _check_lark(config: AppConfig) -> list[tuple[str, bool, str]]:
     headers = {"Authorization": f"Bearer {token}"}
 
     try:
-        with httpx.Client(timeout=15, headers=headers) as client:
+        with httpx.Client(timeout=15, headers=headers, verify=ca_bundle(config)) as client:
             results.append(
                 _probe_lark_scope(
                     client,

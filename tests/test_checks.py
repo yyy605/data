@@ -1,9 +1,12 @@
 """Tests for the environment self-check helpers."""
 
+from datetime import datetime, timezone
+
 import httpx
 import pytest
 
 import main
+from shared.config import AppConfig
 
 
 class StubLarkClient:
@@ -57,3 +60,28 @@ def test_probe_lark_scope_reports_connection_failure():
 
     assert (name, ok) == ("lark_scope_msg", False)
     assert "connection failed" in detail
+
+
+def test_params_carry_the_configured_ca_bundle(monkeypatch, tmp_path):
+    bundle = tmp_path / "ca-bundle.pem"
+    bundle.write_text("-----BEGIN CERTIFICATE-----\n", encoding="utf-8")
+    monkeypatch.setenv("GITHUB_TOKEN", "token")
+    monkeypatch.setenv("LARK_WEBHOOK_URL", "https://example.invalid/hook")
+
+    def build(network):
+        return AppConfig(
+            data={
+                "network": network,
+                "github": {"repositories": [], "token_env": "GITHUB_TOKEN"},
+                "lark": {"webhook_url_env": "LARK_WEBHOOK_URL"},
+            }
+        )
+
+    now = datetime(2026, 11, 13, tzinfo=timezone.utc)
+    custom = build({"ca_bundle": str(bundle)})
+    default = build({})
+
+    assert main._github_params(custom, now, now)["verify"] == str(bundle)
+    assert main._lark_bot_target(custom)["verify"] == str(bundle)
+    assert main._github_params(default, now, now)["verify"] is True
+    assert main._lark_bot_target(default)["verify"] is True

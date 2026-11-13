@@ -81,6 +81,28 @@ def _unquote(value: str) -> str:
     return text
 
 
+def ca_bundle(config: Mapping[str, Any] | AppConfig) -> bool | str:
+    """Return the ``verify`` value for httpx clients.
+
+    Empty/absent ``network.ca_bundle`` keeps httpx's default trust store.
+    A configured path is returned so TLS verification uses that bundle
+    instead of certifi, which is how an intercepting proxy's signing CA
+    gets trusted.
+    """
+    section = config.get("network") or {}
+    if not isinstance(section, Mapping):
+        raise ConfigurationError("network must be a mapping")
+
+    reference = str(section.get("ca_bundle") or "").strip()
+    if not reference:
+        return True
+
+    bundle = Path(reference).expanduser()
+    if not bundle.is_file():
+        raise ConfigurationError(f"network.ca_bundle file not found: {bundle}")
+    return str(bundle)
+
+
 def resolve_env(config: Mapping[str, Any], key: str, required: bool = True) -> str | None:
     reference = config.get(key)
     if not isinstance(reference, str) or not reference:

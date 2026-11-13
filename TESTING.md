@@ -6,7 +6,7 @@
 | 测试文件 | 10 个（`tests/`） |
 | 测试函数 | 71 个 |
 | 实际用例 | **74 个**（3 个参数化） |
-| 最近执行结果 | **81 passed** |
+| 最近执行结果 | **85 passed** |
 | 执行耗时 | 约 0.4s（全部使用 Mock，不访问网络） |
 
 配套文档：[ACCEPTANCE.md](./ACCEPTANCE.md)（验收结果报告）、[task.md](./task.md)（任务清单）。
@@ -25,7 +25,7 @@
         │ test_generator.py     (9)   │  生成层
         │ test_email.py         (6)   │  ┐ 推送层
         │ test_lark_bot.py      (5)   │  ┘
-        │ test_shared.py       (11)   │  基础层
+        │ test_shared.py       (14)   │  基础层
         │ test_schedule.py     (10)   │  调度规则
         └─────────────────────────────┘
 ```
@@ -64,7 +64,7 @@ uv run pytest -v
 
 ## 三、测试用例清单
 
-### 3.1 基础层 — `tests/test_shared.py`（11）
+### 3.1 基础层 — `tests/test_shared.py`（14）
 
 | 用例 | 验证内容 |
 | --- | --- |
@@ -74,6 +74,9 @@ uv run pytest -v
 | `test_load_dotenv_populates_missing_variables` | `.env` 中的 `KEY=value`、带引号值、`export` 前缀被正确解析并注入 `os.environ`，注释与空行被跳过 |
 | `test_load_dotenv_keeps_existing_environment` | 已存在的环境变量优先，不被 `.env` 覆盖，返回的已加载键列表为空 |
 | `test_load_dotenv_ignores_missing_files` | 传入不存在的路径时不报错，直接跳过，便于同时尝试多个候选位置 |
+| `test_ca_bundle_defaults_to_httpx_trust_store` | 未配置 `network.ca_bundle`（或为空串/空白）时返回 `True`，沿用 certifi 默认信任库 |
+| `test_ca_bundle_returns_configured_path` | 配置了存在的 PEM 文件时原样返回该路径，供 httpx 作为 `verify` 使用 |
+| `test_ca_bundle_rejects_missing_file` | 配置的路径不存在时抛 `ConfigurationError`，避免静默回落到默认信任库 |
 | `test_json_log_formatter_outputs_valid_json` | 日志输出为合法 JSON，`extra_*` 字段被展开为顶层键，含 logger 名与 message |
 | `test_storage_creates_saves_reads_and_lists_report` | SQLite 自动建库建表，写入后可按日期读取，列表按日期倒序 |
 | `test_storage_upserts_same_report_date` | 同一日期重复写入时执行覆盖更新，不产生重复记录 |
@@ -181,12 +184,13 @@ uv run pytest -v
 | `test_report_files_are_exported` | 流程结束后 `reports/` 下生成 md/html，内容与数据库记录逐字一致 |
 | `test_file_export_failure_does_not_block_delivery` | 文件写入抛 `OSError` 时日报仍入库并正常推送，退出码 0 |
 
-### 3.10 环境自检 — `tests/test_checks.py`（2 个函数 / 6 个用例）
+### 3.10 环境自检 — `tests/test_checks.py`（3 个函数 / 8 个用例）
 
 | 用例 | 验证内容 |
 | --- | --- |
 | `test_probe_lark_scope_maps_codes_to_hints` | 参数化 5 种飞书返回码：`0`→授予、`99991672`→缺 scope 并给出具体权限名、`99992402`→参数校验失败、`99991663`→token 无效、未知码→原样带出 |
 | `test_probe_lark_scope_reports_connection_failure` | 网络异常时返回失败并标注 `connection failed`，不抛异常 |
+| `test_params_carry_the_configured_ca_bundle` | 配置了 `network.ca_bundle` 时 `_github_params` / `_lark_bot_target` 的 `verify` 为自定义路径；未配置时为 `True`（走 certifi 默认信任库） |
 
 > 这组测试保障 `main.py --check` 能把飞书返回码翻译成可执行的提示，而不是只报一个数字。
 
@@ -307,7 +311,7 @@ docker compose run --rm daily-report python main.py --check
 
 | 指标 | 基线 |
 | --- | --- |
-| 用例总数 | 81 |
+| 用例总数 | 85 |
 | 必须通过率 | 100% |
 | 执行时间上限 | < 5s（当前 0.5s） |
 | 网络依赖 | 0（全部 Mock） |

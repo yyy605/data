@@ -58,6 +58,34 @@ uv run python main.py --date 2026-11-12 --force   # 补发指定日期
 - 只想看效果不发消息：加 `--dry-run`
 - 容器内手动触发：`docker compose run --rm daily-report python main.py --force`
 
+### 本地有 TLS 中间人代理时（Watt Toolkit / Steam++ 等）
+
+这类工具会把 `github.com`、`api.github.com` 等域名写进 hosts 指向 `127.0.0.1`，再由本地进程做 TLS 卸载。浏览器信任其根证书，但 Python 用的是 certifi 自带信任库，于是采集报 `SSL: CERTIFICATE_VERIFY_FAILED`。
+
+处理方式是给程序一个「certifi 信任库 + 代理根证书」的合并文件，并让 `network.ca_bundle` 指向它：
+
+```powershell
+# 1) 导出代理根证书（按证书主题匹配，按需改成自己的 CA 名称）
+$cert = Get-ChildItem Cert:\LocalMachine\Root, Cert:\CurrentUser\Root |
+        Where-Object { $_.Subject -match 'SteamTools' } | Select-Object -First 1
+$b64 = [Convert]::ToBase64String($cert.Export('Cert'), 'InsertLineBreaks')
+$caPem = "-----BEGIN CERTIFICATE-----`n$b64`n-----END CERTIFICATE-----`n"
+
+# 2) 与 certifi 信任库合并
+New-Item -ItemType Directory certs -Force | Out-Null
+$certifi = uv run python -c "import certifi; print(certifi.where())"
+[IO.File]::WriteAllText("certs/ca-bundle.pem",
+    (Get-Content -Raw $certifi).TrimEnd() + "`n`n" + $caPem)
+```
+
+```yaml
+network:
+  ca_bundle: "certs/ca-bundle.pem"   # 留空则使用 certifi 默认信任库
+```
+
+`certs/` 已加入 `.gitignore`，因为证书与机器绑定。容器部署时该目录以只读方式挂载，直接复用同一份 bundle。
+
+
 
 ### 常用命令
 
@@ -106,6 +134,8 @@ docker compose logs -f
 容器内由 cron 按 `CRON_SCHEDULE`（默认 `0 18 * * 1-5`）与 `CRON_TZ`（默认 `Asia/Shanghai`）触发，日志输出到 Docker 标准输出，并配置了每小时一次的健康检查（等价于 `main.py --check`）。
 
 > **注意：`config.yaml` 中的 `schedule.hour` / `schedule.minute` 目前不会被任何代码读取**，修改它们不会改变执行时间。真正生效的只有容器环境变量 `CRON_SCHEDULE`（容器部署）或宿主机 crontab（非容器部署）。这两个键仅为后续"由配置生成调度表达式"预留，保留原样即可。
+
+容器默认使用 `DOCKER_DNS`（缺省 `223.5.5.5`）解析域名。原因是 WSL 通过 Windows DNS 代理会继承 Windows 的 hosts 覆盖，若本机装了 hosts 型代理（如 Watt Toolkit 把 `api.github.com` 指向 `127.0.0.1`），容器内该地址指向容器自身，采集会直接 `Connection refused`。指定外部解析器可绕开这一层；需要走企业内网 DNS 时用 `DOCKER_DNS=<你的 DNS>` 覆盖。
 
 如需单次执行而非调度：
 
