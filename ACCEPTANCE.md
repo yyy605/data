@@ -79,7 +79,7 @@
 | Python 3.11+ | ✅ `requires-python = ">=3.11"` |
 | Docker 容器化部署 | ✅ 镜像 286MB 构建成功，容器内 CLI 与 cron 调度均验证通过 |
 | Cron 定时、无常驻服务 | ✅ 容器内 `/etc/cron.d/daily-report`，`0 18 * * 1-5`，`CRON_TZ=Asia/Shanghai` |
-| 本地 SQLite 存储 | ✅ `data/reports.db`，写入/查询/覆盖更新均有单测；另导出 `reports/<日期>.md|.html` 副本 |
+| 本地 SQLite 存储 | ✅ `data/reports.db`，写入/查询/覆盖更新均有单测；另导出 `reports/<日期>.md` 与 `.html` 副本 |
 | 外部依赖 | ✅ GitHub API、飞书开放平台、SMTP 均实测可达 |
 
 ---
