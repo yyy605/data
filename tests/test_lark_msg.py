@@ -135,6 +135,84 @@ def test_collect_clamps_page_size_to_feishu_limit():
         assert client.requests[0][2]["page_size"] == expected
 
 
+def test_collect_skips_system_messages_without_sender():
+    """Group notices have an empty sender.id and must not fail the collection."""
+    payload = {
+        "code": 0,
+        "data": {
+            "items": [{
+                "message_id": "om_sys_1",
+                "msg_type": "system",
+                "sender": {"id": ""},
+                "body": {"content": '{"template":"{from_user} started the group chat."}'},
+                "create_time": "1794449055527",
+            }],
+            "has_more": False,
+        },
+    }
+    client = MessageClient([make_response(json_data=payload)])
+
+    records = collect(base_params(client))
+
+    assert records == []
+
+
+def test_collect_skips_bot_cards_and_keeps_human_text():
+    payload = {
+        "code": 0,
+        "data": {
+            "items": [
+                {
+                    "message_id": "om_card",
+                    "msg_type": "interactive",
+                    "sender": {"id": "cli_c08abc1d"},
+                    "body": {"content": '{"title":"研发团队 日报","elements":[]}'},
+                    "create_time": "1794449102057",
+                },
+                {
+                    "message_id": "om_text",
+                    "msg_type": "text",
+                    "sender": {"id": "ou_zhangsan"},
+                    "body": {"content": '{"text":"项目风险已同步"}'},
+                    "create_time": "1794449102057",
+                },
+            ],
+            "has_more": False,
+        },
+    }
+    client = MessageClient([make_response(json_data=payload)])
+
+    records = collect(base_params(client))
+
+    assert [record.message_id for record in records] == ["om_text"]
+    assert records[0].content == "项目风险已同步"
+    assert records[0].sender_id == "ou_zhangsan"
+
+
+def test_collect_extracts_text_from_post_message():
+    payload = {
+        "code": 0,
+        "data": {
+            "items": [{
+                "message_id": "om_post",
+                "msg_type": "post",
+                "sender": {"id": "ou_zhangsan"},
+                "body": {"content": '{"title":"周会结论","content":[[{"tag":"text","text":"需求已确认"}],[{"tag":"text","text":"下周提测"}]]}'},
+                "create_time": "1794449102057",
+            }],
+            "has_more": False,
+        },
+    }
+    client = MessageClient([make_response(json_data=payload)])
+
+    records = collect(base_params(client))
+
+    assert len(records) == 1
+    assert "周会结论" in records[0].content
+    assert "需求已确认" in records[0].content
+    assert "下周提测" in records[0].content
+
+
 def test_collect_retries_timeout_three_times_and_returns_empty():
     client = MessageClient([
         httpx.ReadTimeout("timeout"),

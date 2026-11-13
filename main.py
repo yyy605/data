@@ -461,15 +461,22 @@ def _check_lark(config: AppConfig) -> list[tuple[str, bool, str]]:
                     )
                 )
 
-            results.append(
-                _probe_lark_scope(
-                    client,
-                    "lark_scope_chat",
-                    f"{base_url}/open-apis/im/v1/chats",
-                    {"page_size": 1},
-                    "im:chat:readonly",
+            # The chat-list scope is only needed to discover chat_id; when it is
+            # already configured this permission is optional.
+            if chat_id:
+                results.append(
+                    ("lark_scope_chat", True, "not required (lark.chat_id is configured)")
                 )
-            )
+            else:
+                results.append(
+                    _probe_lark_scope(
+                        client,
+                        "lark_scope_chat",
+                        f"{base_url}/open-apis/im/v1/chats",
+                        {"page_size": 1},
+                        "im:chat:readonly",
+                    )
+                )
     except httpx.HTTPError as exc:
         results.append(("lark_scope", False, f"connection failed: {exc}"))
 

@@ -4,9 +4,9 @@
 | --- | --- |
 | 测试框架 | pytest 8.x |
 | 测试文件 | 10 个（`tests/`） |
-| 测试函数 | 68 个 |
+| 测试函数 | 71 个 |
 | 实际用例 | **74 个**（3 个参数化） |
-| 最近执行结果 | **75 passed** |
+| 最近执行结果 | **78 passed** |
 | 执行耗时 | 约 0.4s（全部使用 Mock，不访问网络） |
 
 配套文档：[ACCEPTANCE.md](./ACCEPTANCE.md)（验收结果报告）、[task.md](./task.md)（任务清单）。
@@ -21,7 +21,7 @@
         ├─────────────────────────────┤
   单元  │ test_github.py        (6)   │  ┐
         │ test_lark_task.py     (8)   │  │ 采集层
-        │ test_lark_msg.py      (7)   │  ┘
+        │ test_lark_msg.py     (10)   │  ┘
         │ test_generator.py     (9)   │  生成层
         │ test_email.py         (6)   │  ┐ 推送层
         │ test_lark_bot.py      (5)   │  ┘
@@ -101,7 +101,7 @@ uv run pytest -v
 | `test_collect_does_not_refresh_token_on_permission_error` | `99991672`（缺 scope）**不触发**刷新，仅请求 1 次，错误不被掩盖 |
 | `test_collect_retries_timeout_three_times_and_returns_empty` | 超时 3 次后返回空列表 |
 
-### 3.4 飞书消息 — `tests/test_lark_msg.py`（7）
+### 3.4 飞书消息 — `tests/test_lark_msg.py`（10）
 
 | 用例 | 验证内容 |
 | --- | --- |
@@ -112,6 +112,9 @@ uv run pytest -v
 | `test_collect_retries_timeout_three_times_and_returns_empty` | 超时 3 次后返回空列表 |
 | `test_collect_does_not_refresh_token_on_permission_error` | `99991672` 不触发刷新，避免掩盖真实权限错误 |
 | `test_collect_clamps_page_size_to_feishu_limit` | `page_size` 被夹在 1–50：飞书对 `>50` 返回 `99992402`，会掩盖真实的权限错误 |
+| `test_collect_skips_system_messages_without_sender` | `msg_type=system` 的群通知（`sender.id` 为空）被跳过，不导致整个数据源失败 |
+| `test_collect_skips_bot_cards_and_keeps_human_text` | 机器人卡片（`interactive`）被跳过，真人文本保留并正确解析 |
+| `test_collect_extracts_text_from_post_message` | 富文本（`post`）能拼出标题与各段文字 |
 
 ### 3.5 日报生成 — `tests/test_generator.py`（9）
 
@@ -301,7 +304,7 @@ docker compose run --rm daily-report python main.py --check
 
 | 指标 | 基线 |
 | --- | --- |
-| 用例总数 | 75 |
+| 用例总数 | 78 |
 | 必须通过率 | 100% |
 | 执行时间上限 | < 5s（当前 0.5s） |
 | 网络依赖 | 0（全部 Mock） |

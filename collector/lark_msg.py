@@ -22,6 +22,10 @@ DEFAULT_SENSITIVE_KEYWORDS = ("薪资", "绩效", "工资", "奖金")
 MAX_PAGE_SIZE = 50
 DEFAULT_PAGE_SIZE = 50
 
+# Only human conversation is useful for the 协作沟通 section. Feishu returns
+# system notices, bot cards and media as separate message types.
+SUPPORTED_MSG_TYPES = ("text", "post")
+
 
 @dataclass(frozen=True)
 class MessageRecord:
@@ -96,6 +100,8 @@ def collect(params: Mapping[str, Any]) -> list[MessageRecord]:
                 if not isinstance(item, Mapping):
                     continue
                 record = _to_message_record(item)
+                if record is None:
+                    continue
                 if _matches_filters(record.content, keywords, sensitive_keywords):
                     records.append(record)
 
@@ -229,7 +235,17 @@ def _page_size(params: Mapping[str, Any]) -> int:
     return max(1, min(requested, MAX_PAGE_SIZE))
 
 
-def _to_message_record(payload: Mapping[str, Any]) -> MessageRecord:
+def _to_message_record(payload: Mapping[str, Any]) -> MessageRecord | None:
+    """Convert one Feishu message, or return None when it is not useful content.
+
+    System messages (``msg_type=system``) such as "X started the group chat"
+    carry no sender and are not collaboration content, so they are skipped
+    instead of failing the whole collection.
+    """
+    msg_type = str(payload.get("msg_type") or "").strip()
+    if msg_type and msg_type not in SUPPORTED_MSG_TYPES:
+        return None
+
     message_id = payload.get("message_id") or payload.get("id") or payload.get("uuid")
     sender_data = payload.get("sender") or payload.get("sender_id") or ""
     if isinstance(sender_data, Mapping):
@@ -237,12 +253,13 @@ def _to_message_record(payload: Mapping[str, Any]) -> MessageRecord:
     else:
         sender = sender_data
 
-    content_data = payload.get("body", {}).get("content") if isinstance(payload.get("body", {}), Mapping) else payload.get("content")
-    content = _extract_content(content_data, payload.get("content"))
+    body = payload.get("body")
+    content_data = body.get("content") if isinstance(body, Mapping) else payload.get("content")
+    content = _extract_content(content_data, payload.get("content"), msg_type)
     sent_value = payload.get("create_time") or payload.get("created_at") or payload.get("sent_at") or payload.get("timestamp")
 
-    if not message_id or sender is None or not content or sent_value is None:
-        raise ValueError("Incomplete Lark message payload")
+    if not message_id or not sender or not content or sent_value is None:
+        return None
 
     return MessageRecord(
         message_id=str(message_id),
@@ -252,25 +269,54 @@ def _to_message_record(payload: Mapping[str, Any]) -> MessageRecord:
     )
 
 
-def _extract_content(body_content: Any, fallback: Any = None) -> str:
-    if isinstance(body_content, Mapping):
-        text_value = body_content.get("text")
-        if text_value is not None:
-            return str(text_value).strip()
+def _extract_content(body_content: Any, fallback: Any = None, msg_type: str = "") -> str:
+    decoded: Any = None
     if isinstance(body_content, str):
         text = body_content.strip()
         if text.startswith("{"):
             try:
                 decoded = json.loads(text)
-                text_value = decoded.get("text") if isinstance(decoded, Mapping) else None
-                if text_value is not None:
-                    return str(text_value).strip()
             except json.JSONDecodeError:
-                pass
-        return text
-    if fallback is not None and fallback != body_content:
-        return _extract_content(fallback)
-    return ""
+                decoded = None
+        if decoded is None:
+            return text
+    elif isinstance(body_content, Mapping):
+        decoded = body_content
+    else:
+        if fallback is not None and fallback != body_content:
+            return _extract_content(fallback, None, msg_type)
+        return ""
+
+    if not isinstance(decoded, Mapping):
+        return ""
+
+    text_value = decoded.get("text")
+    if text_value is not None:
+        return str(text_value).strip()
+
+    # Rich text ("post") nests text runs inside paragraphs.
+    return _extract_post_text(decoded)
+
+
+def _extract_post_text(payload: Mapping[str, Any]) -> str:
+    parts: list[str] = []
+    title = payload.get("title")
+    if isinstance(title, str) and title.strip():
+        parts.append(title.strip())
+
+    paragraphs = payload.get("content")
+    if isinstance(paragraphs, list):
+        for paragraph in paragraphs:
+            if not isinstance(paragraph, list):
+                continue
+            for element in paragraph:
+                if not isinstance(element, Mapping):
+                    continue
+                value = element.get("text")
+                if isinstance(value, str) and value.strip():
+                    parts.append(value.strip())
+    return " ".join(parts).strip()
+
 
 
 def _matches_filters(content: str, keywords: tuple[str, ...], sensitive_keywords: tuple[str, ...]) -> bool:
