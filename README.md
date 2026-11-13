@@ -53,7 +53,7 @@ uv run python main.py --force              # 立即生成并推送（工作日/�
 uv run python main.py --date 2026-11-12 --force   # 补发指定日期
 ```
 
-- 不加 `--force` 时，非工作日与当天计划时间之前会被跳过，退出码仍为 `0`
+- 不加 `--force` 时，非工作日（周末 / 法定节假日，可用 `schedule.holidays`、`schedule.workdays` 覆盖）会被跳过，退出码仍为 `0`
 - 同一 `report_date` 重复执行是幂等的：数据库按日期覆盖，`reports/<日期>.md`、`reports/<日期>.html` 也会被重写，不会产生重复记录
 - 只想看效果不发消息：加 `--dry-run`
 - 容器内手动触发：`docker compose run --rm daily-report python main.py --force`
