@@ -6,7 +6,7 @@
 | 测试文件 | 10 个（`tests/`） |
 | 测试函数 | 68 个 |
 | 实际用例 | **74 个**（3 个参数化） |
-| 最近执行结果 | **74 passed** |
+| 最近执行结果 | **75 passed** |
 | 执行耗时 | 约 0.4s（全部使用 Mock，不访问网络） |
 
 配套文档：[ACCEPTANCE.md](./ACCEPTANCE.md)（验收结果报告）、[task.md](./task.md)（任务清单）。
@@ -301,7 +301,7 @@ docker compose run --rm daily-report python main.py --check
 
 | 指标 | 基线 |
 | --- | --- |
-| 用例总数 | 74 |
+| 用例总数 | 75 |
 | 必须通过率 | 100% |
 | 执行时间上限 | < 5s（当前 0.5s） |
 | 网络依赖 | 0（全部 Mock） |
