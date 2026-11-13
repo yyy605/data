@@ -18,15 +18,28 @@ schedule:
   workdays: []
 
 members:
-  # github_login / lark_user_id / email are mapped to the same team member.
+  # Every identity below is matched case-insensitively; any hit attributes the
+  # work to this member. A commit matches on `author` (GitHub login, falling back
+  # to the git author name) or `author_email`; a task on its assignee name; a
+  # message on the sender's open_id.
+  #
+  # github_login / lark_user_id / email are the primary identities.
+  # git_emails: raw `git config user.email` values. Needed because GitHub returns
+  #   `author: null` for commits whose email is not linked to an account, leaving
+  #   only the free-form git author name to match on.
+  # aliases: extra names (English name, former name, task display name…).
   - github_login: "github-user-1"
     lark_user_id: "ou_example_user_1"
     name: "成员一"
     email: "member1@example.com"
+    git_emails: ["member1@example.com"]
+    aliases: ["Member One"]
   - github_login: "github-user-2"
     lark_user_id: "ou_example_user_2"
     name: "成员二"
     email: "member2@example.com"
+    git_emails: []
+    aliases: []
 
 github:
   token_env: "GITHUB_TOKEN"

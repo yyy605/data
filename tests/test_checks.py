@@ -1,6 +1,7 @@
 """Tests for the environment self-check helpers."""
 
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -85,3 +86,62 @@ def test_params_carry_the_configured_ca_bundle(monkeypatch, tmp_path):
     assert main._lark_bot_target(custom)["verify"] == str(bundle)
     assert main._github_params(default, now, now)["verify"] is True
     assert main._lark_bot_target(default)["verify"] is True
+
+
+def test_member_keys_merge_optional_identity_lists():
+    keys = main._member_keys(
+        {
+            "github_login": "yyy605",
+            "lark_user_id": "ou_abc",
+            "name": "原良",
+            "email": "member@example.com",
+            "git_emails": ["Raw@Example.com", "second@example.com"],
+            "aliases": "Lenovo",
+        }
+    )
+
+    assert {"yyy605", "ou_abc", "原良", "member@example.com"} <= keys
+    assert "raw@example.com" in keys
+    assert "second@example.com" in keys
+    assert "lenovo" in keys
+
+
+def test_matches_accepts_multiple_values_and_comma_lists():
+    keys = {"原良", "20233076@qq.com", "于广飞"}
+
+    assert main._matches(keys, "", "20233076@qq.com")
+    assert main._matches(keys, "原良", "")
+    assert main._matches(keys, "于广飞, 王博宁")
+    assert not main._matches(keys, "王博宁", "unknown@example.com")
+    assert not main._matches(keys, None, "")
+
+
+def test_commit_is_attributed_by_git_email_when_name_differs():
+    records = [SimpleNamespace(author="Lenovo", author_email="20233076@qq.com")]
+    config = AppConfig(
+        data={
+            "members": [
+                {
+                    "name": "原良",
+                    "github_login": "yyy605",
+                    "lark_user_id": "ou_abc",
+                    "email": "member@example.com",
+                    "git_emails": ["20233076@qq.com"],
+                },
+                {
+                    "name": "于广飞",
+                    "github_login": "github-user-2",
+                    "lark_user_id": "ou_def",
+                    "email": "member2@example.com",
+                },
+            ]
+        }
+    )
+
+    reports = main.build_member_reports(
+        config,
+        {"github": records, "lark_task": [], "lark_msg": []},
+        set(),
+    )
+
+    assert [len(report.commits) for report in reports] == [1, 0]

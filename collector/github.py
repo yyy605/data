@@ -20,8 +20,11 @@ from shared.logger import configure_logging, log_extra
 class CommitRecord:
     """A normalized GitHub commit record.
 
-    The seven fields are kept stable because downstream report generation only
+    The listed fields are kept stable because downstream report generation only
     needs commit identity, source repository, authorship, timestamp, and diff size.
+    ``author_email`` exists because GitHub returns ``author: null`` for commits
+    whose email is not linked to an account, so the raw git identity is the only
+    thing left to attribute the work with.
     """
 
     sha: str
@@ -31,6 +34,7 @@ class CommitRecord:
     committed_at: datetime
     additions: int
     deletions: int
+    author_email: str = ""
 
 
 def collect(params: Mapping[str, Any]) -> list[CommitRecord]:
@@ -207,6 +211,7 @@ def _to_commit_record(payload: Mapping[str, Any], repository: str) -> CommitReco
         committed_at=committed_at,
         additions=int(stats.get("additions", 0)),
         deletions=int(stats.get("deletions", 0)),
+        author_email=str(author_data.get("email") or "").strip(),
     )
 
 

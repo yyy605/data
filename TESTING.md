@@ -6,7 +6,7 @@
 | 测试文件 | 10 个（`tests/`） |
 | 测试函数 | 71 个 |
 | 实际用例 | **74 个**（3 个参数化） |
-| 最近执行结果 | **85 passed** |
+| 最近执行结果 | **89 passed** |
 | 执行耗时 | 约 0.4s（全部使用 Mock，不访问网络） |
 
 配套文档：[ACCEPTANCE.md](./ACCEPTANCE.md)（验收结果报告）、[task.md](./task.md)（任务清单）。
@@ -83,11 +83,12 @@ uv run pytest -v
 | `test_export_writes_markdown_and_html_files` | 导出 `<日期>.md` / `<日期>.html`，内容与传入一致，且不残留 `.tmp` 临时文件 |
 | `test_export_overwrites_same_date_without_leftovers` | 同日重复导出覆盖旧文件，目录内不产生多余文件 |
 
-### 3.2 GitHub 采集 — `tests/test_github.py`（6）
+### 3.2 GitHub 采集 — `tests/test_github.py`（7）
 
 | 用例 | 验证内容 |
 | --- | --- |
-| `test_collect_returns_seven_field_commit_record` | 返回 `CommitRecord` 且**恰好 7 个字段**、类型正确；`since`/`until` 正确传给 API；作者优先取 GitHub login |
+| `test_collect_returns_seven_field_commit_record` | 返回 `CommitRecord` 且**恰好 8 个字段**、类型正确；`since`/`until` 正确传给 API；作者优先取 GitHub login；`author_email` 取自 `commit.author.email` |
+| `test_collect_keeps_git_identity_when_account_is_unlinked` | `author: null`（邮箱未绑定到 GitHub 账号）时仍保留 git 作者名与邮箱，保证归属可用 |
 | `test_collect_supports_pagination` | 依据 `Link: rel="next"` 翻页，`per_page=100`，跨页结果正确合并 |
 | `test_collect_retries_timeout_three_times_and_returns_empty_list` | 连续超时 3 次后返回空列表（不抛异常），且只 sleep 2 次 |
 | `test_collect_requires_repository` | 未配置仓库时抛 `CollectorError` |
@@ -184,13 +185,16 @@ uv run pytest -v
 | `test_report_files_are_exported` | 流程结束后 `reports/` 下生成 md/html，内容与数据库记录逐字一致 |
 | `test_file_export_failure_does_not_block_delivery` | 文件写入抛 `OSError` 时日报仍入库并正常推送，退出码 0 |
 
-### 3.10 环境自检 — `tests/test_checks.py`（3 个函数 / 8 个用例）
+### 3.10 环境自检与归属 — `tests/test_checks.py`（6 个函数 / 11 个用例）
 
 | 用例 | 验证内容 |
 | --- | --- |
 | `test_probe_lark_scope_maps_codes_to_hints` | 参数化 5 种飞书返回码：`0`→授予、`99991672`→缺 scope 并给出具体权限名、`99992402`→参数校验失败、`99991663`→token 无效、未知码→原样带出 |
 | `test_probe_lark_scope_reports_connection_failure` | 网络异常时返回失败并标注 `connection failed`，不抛异常 |
 | `test_params_carry_the_configured_ca_bundle` | 配置了 `network.ca_bundle` 时 `_github_params` / `_lark_bot_target` 的 `verify` 为自定义路径；未配置时为 `True`（走 certifi 默认信任库） |
+| `test_member_keys_merge_optional_identity_lists` | `git_emails` / `aliases` 会被并入匹配键集合，且统一 casefold；`aliases` 允许写成单个字符串 |
+| `test_matches_accepts_multiple_values_and_comma_lists` | `_matches` 接受多个候选值（提交记录同时比对 `author` 与 `author_email`），并按逗号拆分多人负责人；空值不误命中 |
+| `test_commit_is_attributed_by_git_email_when_name_differs` | git 作者名与成员姓名不同时，仅凭 `git_emails` 中的邮箱也能正确归属到该成员 |
 
 > 这组测试保障 `main.py --check` 能把飞书返回码翻译成可执行的提示，而不是只报一个数字。
 
@@ -311,7 +315,7 @@ docker compose run --rm daily-report python main.py --check
 
 | 指标 | 基线 |
 | --- | --- |
-| 用例总数 | 85 |
+| 用例总数 | 89 |
 | 必须通过率 | 100% |
 | 执行时间上限 | < 5s（当前 0.5s） |
 | 网络依赖 | 0（全部 Mock） |

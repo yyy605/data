@@ -803,6 +803,47 @@ Windows 本机：github  FAIL  SSL: CERTIFICATE_VERIFY_FAILED
 
 ---
 
+## ADR-026 归属身份改成「多键匹配」，并给提交记录补上邮箱
+
+- **状态**：已采纳
+- **日期**：2026-11-13
+- **代码位置**：`main.py:_member_keys` / `_matches`、`collector/github.py:CommitRecord.author_email`、`shared/config.py` 的成员校验
+
+**当时的问题**
+排查"怎么区分不同人做的任务"时实测发现，归属其实只靠一个键在工作：
+
+```
+commit author : ['原良']            ← 汉字姓名，不是 GitHub 登录名 yyy605
+GitHub API    : author(账号) = null, git.author = {name: 原良, email: 20233076@qq.com}
+配置里的 email : member13587511845@qq.com   ← 与 git 邮箱不一致
+```
+
+GitHub 只在提交邮箱已绑定到账号时才返回 `author.login`，否则给 `null`。本机 `git config user.email` 是 `20233076@qq.com`，未绑定到 `yyy605`，于是采集器退回读 `commit.author.name`。结果：**改一下 git 用户名，整条归属链就断了**；而配置里的 `email` 与 git 邮箱又对不上，连兜底都没有。
+
+**考虑过的方案**
+
+| 方案 | 优点 | 为什么没选 |
+| --- | --- | --- |
+| 只让用户去 GitHub 绑邮箱 | 零代码 | 绑定是不可控的外部动作；没绑定的人照样归不到 |
+| 把邮箱拼进 `author` 字段当匹配值 | 不改 schema | `author` 会渲染进日报（` — 原良`），拼上邮箱就无法阅读 |
+| 用登录名强制覆盖 | 简单 | `author: null` 时根本没有登录名可覆盖 |
+| **多键匹配 + 给记录补 `author_email`** ✅ | 姓名、登录名、git 邮箱任一条都能归属；互不依赖 | — |
+
+**决定**
+1. `CommitRecord` 增加 `author_email`（默认空串），采集时取 `commit.author.email`；
+2. 成员支持可选列表 `git_emails`、`aliases`，加载时校验必须是字符串或非空字符串列表，避免拼错成 mapping 后静默失效；
+3. `_matches(keys, *values)` 接受多个候选值，提交记录同时用 `author` 与 `author_email` 比对，任务/消息仍各用一个字段。
+
+**代价 / 已知不足**
+- `CommitRecord` 从 7 字段变为 8 字段，`test_collect_returns_seven_field_commit_record` 相应改名并断言 8 字段；这是内部契约，task/proposal/design 三份文档未固定字段个数
+- 多键放宽了匹配面：两个成员如果填了同一个邮箱/别名，同一条记录会同时归给两人（当前行为是"任一命中即归属"，不做唯一性告警）
+- `git_emails` 需要人工维护，换机器改了 `git config user.email` 后要同步
+
+**什么情况下应该重新评估**
+若团队统一要求提交邮箱绑定到 GitHub 账号，`author.login` 恒定可用，`git_emails` 就退化为冗余保险，可考虑改为"只允许 login 匹配 + 未绑定即告警"。
+
+---
+
 ## 附：被否决方案速查
 
 | 方案 | 否决原因 | 相关 ADR |
@@ -818,6 +859,7 @@ Windows 本机：github  FAIL  SSL: CERTIFICATE_VERIFY_FAILED
 | APScheduler 常驻 | 违背"无常驻服务"约束 | ADR-020 |
 | 依赖 `python-dotenv` | 一个 20 行解析器不值得加依赖 | ADR-024 |
 | 关闭 TLS 校验以穿过代理 | 等于放弃中间人防护 | ADR-025 |
+| 只靠单个身份字段归属 | git 用户名一变就断链 | ADR-026 |
 
 ---
 

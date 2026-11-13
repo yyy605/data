@@ -209,7 +209,13 @@ def build_member_reports(
         members.append(
             MemberReport(
                 name=str(member["name"]),
-                commits=[item for item in commits if _matches(keys, getattr(item, "author", ""))],
+                commits=[
+                    item
+                    for item in commits
+                    if _matches(
+                        keys, getattr(item, "author", ""), getattr(item, "author_email", "")
+                    )
+                ],
                 tasks=[item for item in tasks if _matches(keys, getattr(item, "assignee", ""))],
                 messages=[item for item in messages if _matches(keys, getattr(item, "sender_id", ""))],
                 failures=set(failures),
@@ -640,20 +646,32 @@ def _is_working_day(report_date: date, config: AppConfig) -> bool:
 
 
 def _member_keys(member: Mapping[str, Any]) -> set[str]:
-    values = (
+    """Every identity a member can be matched by, case-folded."""
+    values: list[Any] = [
         member.get("github_login"),
         member.get("lark_user_id"),
         member.get("name"),
         member.get("email"),
-    )
+    ]
+    for field in ("git_emails", "aliases"):
+        extra = member.get(field) or []
+        if isinstance(extra, str):
+            extra = [extra]
+        if isinstance(extra, (list, tuple)):
+            values.extend(extra)
     return {str(value).strip().casefold() for value in values if value}
 
 
-def _matches(keys: set[str], value: Any) -> bool:
-    if not value:
-        return False
-    candidates = str(value).split(",") if "," in str(value) else [str(value)]
-    return any(candidate.strip().casefold() in keys for candidate in candidates)
+def _matches(keys: set[str], *values: Any) -> bool:
+    """True when any candidate value resolves to one of the member's keys."""
+    for value in values:
+        if not value:
+            continue
+        text = str(value)
+        candidates = text.split(",") if "," in text else [text]
+        if any(candidate.strip().casefold() in keys for candidate in candidates):
+            return True
+    return False
 
 
 def _storage_path(config: AppConfig) -> str:

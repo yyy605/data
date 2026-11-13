@@ -7,7 +7,7 @@
 | 被验收的代码提交 | `28bd845`（验收基线，本报告单独提交） |
 | 验收日期 | 2026-11-13 |
 | 代码规模 | 源码 16 文件 2591 行；测试 11 文件 1613 行 |
-| 自动化测试 | **85 个用例，全部通过** |
+| 自动化测试 | **89 个用例，全部通过** |
 
 本报告只记录**实测结果**。无法在当前环境验证的项目均明确标注为「待验证」，不做推测性结论。
 
@@ -154,7 +154,7 @@ uv run python main.py --dry-run      # 采集+生成，不推送
 uv run python main.py                # 完整流程
 uv run python main.py --force        # 非工作日也执行（手动立即推送）
 uv run python main.py --date 2026-11-12 --force   # 指定日期补发
-uv run pytest -q                     # 运行测试（85 项）
+uv run pytest -q                     # 运行测试（89 项）
 ```
 
 退出码：`0` 成功（含跳过非工作日、dry-run）；`1` 配置错误、全部数据源失败或推送失败。
@@ -182,7 +182,7 @@ uv run pytest -q                     # 运行测试（85 项）
 ### 数据口径
 
 - 采集窗口：**滚动 24 小时**（终点为执行时刻，或指定日期的当日 23:59:59）
-- 成员归属：按 `members` 中 `github_login` / `lark_user_id` / `name` / `email` 四者任一匹配
+- 成员归属：按 `members` 中 `github_login` / `lark_user_id` / `name` / `email` / `git_emails` / `aliases` 任一匹配（大小写不敏感）
 - 敏感词：`excluded_keywords` 命中的消息不会进入日报
 
 ---
@@ -211,6 +211,8 @@ uv run pytest -q                     # 运行测试（85 项）
 | README 补「手动触发一次日报」「生成条件」说明 | 文档与代码行为对齐 |
 | `DECISIONS.md` 新增 ADR-024（记录自研 `.env` 解析的取舍） | ADR 总数 23 → 24 |
 | `DECISIONS.md` 新增 ADR-025（记录 CA 信任做成配置项的取舍） | ADR 总数 24 → 25 |
+| `CommitRecord` 新增 `author_email`；成员支持 `git_emails` / `aliases`；`_matches` 支持多候选值 | 归属不再依赖单一姓名；补 4 个单测，用例数 85 → 89 |
+| `DECISIONS.md` 新增 ADR-026（记录多键归属的取舍） | ADR 总数 25 → 26 |
 
 ---
 

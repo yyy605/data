@@ -117,7 +117,8 @@ uv run pytest -q                  # 运行全部测试
 - 日报历史记录写入 SQLite（`storage.sqlite_path`，默认 `data/reports.db`）
 - 同时导出人可读副本：`reports/<日期>.md` 与 `reports/<日期>.html`（目录由 `storage.reports_dir` 配置，默认 `reports`）。两者与数据库同源同次写入，同日重跑覆盖；文件写入失败不会阻断推送
 - 采集窗口为**滚动 24 小时**：结束时间是执行时刻（或 `--date` 指定日期的当日 23:59:59），起点为终点前 24 小时；时区取 `team.timezone`
-- 成员归属通过 `members` 中的 `github_login`、`lark_user_id`、`name`、`email` 映射
+- 成员归属通过 `members` 中的 `github_login`、`lark_user_id`、`name`、`email`，以及可选的 `git_emails`（`git config user.email` 的原始值）与 `aliases`（英文名/曾用名等）映射；任一命中即归属，大小写不敏感
+- 提交记录同时保留 `author`（GitHub 登录名，为空时退回 git 作者名）与 `author_email`：GitHub 对未绑定账号的邮箱返回 `author: null`，此时只有 git 原始身份可用于归属
 - 生成条件：只要**至少一个**数据源正常返回就会生成日报；仅当三个源全部失败时才不生成并返回 `1`。采集成功但无记录不算失败，对应板块显示「今日无记录」
 - 非工作日跳过：法定节假日与调休由 `chinesecalendar` 库自动识别；`schedule.holidays` / `schedule.workdays` 可手工覆盖个别日期；无需跳过时使用 `--force`
 - 飞书任务采集使用 **Task v2** 接口 `/open-apis/task/v2/tasks`。该接口不支持服务端时间过滤，因此按 `updated_at` 在本地裁剪采集窗口；配置 `lark.tasklist_id` 可只采集指定任务清单（留空表示全部）

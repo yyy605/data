@@ -17,7 +17,11 @@ def commit_detail_payload(sha="abc123"):
         "sha": sha,
         "commit": {
             "message": "Add report collector",
-            "author": {"name": "Alice", "date": "2026-11-06T09:00:00Z"},
+            "author": {
+                "name": "Alice",
+                "email": "alice@example.com",
+                "date": "2026-11-06T09:00:00Z",
+            },
         },
         "author": {"login": "alice"},
         "stats": {"additions": 12, "deletions": 3},
@@ -66,13 +70,41 @@ def test_collect_returns_seven_field_commit_record():
     assert len(records) == 1
     record = records[0]
     assert isinstance(record, CommitRecord)
-    assert len(record.__dataclass_fields__) == 7
+    assert len(record.__dataclass_fields__) == 8
     assert record.repository == "example-org/repo"
     assert record.author == "alice"
+    assert record.author_email == "alice@example.com"
     assert record.additions == 12
     assert record.deletions == 3
     assert isinstance(record.committed_at, datetime)
     assert client.requests[0][2]["since"] == "2026-11-06T00:00:00Z"
+
+
+@pytest.mark.parametrize("delay", [0])
+def test_collect_keeps_git_identity_when_account_is_unlinked(delay):
+    """GitHub returns author: null when the commit email is not linked to an
+    account, so the raw git name and email must survive for attribution."""
+    payload = commit_detail_payload()
+    payload["author"] = None
+    payload["commit"]["author"] = {
+        "name": "原良",
+        "email": "20233076@qq.com",
+        "date": "2026-11-06T09:00:00Z",
+    }
+    client = SequenceClient([
+        response(200, commit_list_payload()),
+        response(200, payload),
+    ])
+
+    records = collect({
+        "repositories": [{"owner": "example-org", "name": "repo"}],
+        "since": "2026-11-06T00:00:00Z",
+        "until": "2026-11-06T23:59:59Z",
+        "client": client,
+    })
+
+    assert records[0].author == "原良"
+    assert records[0].author_email == "20233076@qq.com"
 
 
 @pytest.mark.parametrize("delay", [0])

@@ -145,6 +145,19 @@ def _validate_required(config: Mapping[str, Any]) -> None:
                 + ", ".join(missing_member_fields)
             )
 
+        for optional_list in ("git_emails", "aliases"):
+            value = member.get(optional_list)
+            if value is None:
+                continue
+            if isinstance(value, str):
+                continue
+            if not isinstance(value, list) or not all(
+                isinstance(item, str) and item.strip() for item in value
+            ):
+                raise ConfigurationError(
+                    f"members[{index}].{optional_list} must be a string or a list of non-empty strings"
+                )
+
     github = config.get("github")
     if not isinstance(github, Mapping) or not github.get("repositories"):
         raise ConfigurationError("github.repositories is required")
