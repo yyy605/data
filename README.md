@@ -42,6 +42,23 @@ cp .env.example .env                 # 填入真实密钥
 
 `config.yaml` 中的密钥均以“环境变量名”引用，真实值通过环境变量注入，不写进配置文件。
 
+`main.py` 启动时会自动加载 `.env`（优先取 `config.yaml` 同目录，其次当前目录），已存在的环境变量优先，因此本地直接 `python main.py` 即可；容器内由 `env_file` 注入，行为一致。
+
+### 手动触发一次日报
+
+日报默认按计划时间自动推送，需要立即补发时手动执行一次即可，无需等待定时任务：
+
+```bash
+uv run python main.py --force              # 立即生成并推送（工作日/节假日均执行）
+uv run python main.py --date 2026-11-12 --force   # 补发指定日期
+```
+
+- 不加 `--force` 时，非工作日与当天计划时间之前会被跳过，退出码仍为 `0`
+- 同一 `report_date` 重复执行是幂等的：数据库按日期覆盖，`reports/<日期>.md`、`reports/<日期>.html` 也会被重写，不会产生重复记录
+- 只想看效果不发消息：加 `--dry-run`
+- 容器内手动触发：`docker compose run --rm daily-report python main.py --force`
+
+
 ### 常用命令
 
 ```bash

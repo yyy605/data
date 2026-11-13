@@ -10,6 +10,7 @@ import smtplib
 import socket
 import ssl
 import sys
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
@@ -19,7 +20,7 @@ import httpx
 from collector import github, lark_msg, lark_task
 from generator.formatter import MemberReport, generate
 from notifier import email, lark_bot
-from shared.config import AppConfig, load_config
+from shared.config import AppConfig, load_config, load_dotenv
 from shared.errors import ConfigurationError
 from shared.logger import configure_logging, log_extra
 from shared.storage import ReportStorage, export_report_files
@@ -46,6 +47,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     logger = configure_logging()
+
+    # Load secrets from .env next to the config file first, then the working
+    # directory, so `python main.py` works without extra flags.
+    loaded = load_dotenv(Path(args.config).resolve().with_name(".env"), Path(".env"))
+    if loaded:
+        logger.info(
+            "Loaded environment file",
+            extra=log_extra(keys=len(loaded)),
+        )
+
     try:
         config = load_config(args.config)
     except ConfigurationError as exc:

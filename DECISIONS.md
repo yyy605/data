@@ -723,6 +723,44 @@ page_size=100  → 99992402  field validation failed   ← 采集器当时用的
 
 ---
 
+## ADR-024 程序自己加载 `.env`，而不是要求调用方注入
+
+- **状态**：已采纳
+- **日期**：2026-11-13
+- **代码位置**：`shared/config.py:load_dotenv`、`main.py:main`
+
+**当时的问题**
+密钥全部放在 `.env`，但 `.env` 只是文件，不会被进程读取。实测直接 `python main.py --check` 的结果：
+
+```
+environment      FAIL  missing: GITHUB_TOKEN, LARK_APP_ID, LARK_APP_SECRET,
+                              LARK_WEBHOOK_URL, SMTP_HOST, SMTP_FROM
+```
+
+也就是说"手动跑一次日报"需要用户先记住一条加载环境变量的命令（`uv run --env-file .env ...` 或 PowerShell 的循环导出），否则每次都要重新踩一遍坑。定时任务和容器不受影响（cron 有外部注入、compose 有 `env_file`），**只有人工触发这个场景会失败**——而人工触发恰恰是最需要"零门槛"的场景。
+
+**考虑过的方案**
+
+| 方案 | 优点 | 为什么没选 |
+| --- | --- | --- |
+| 文档里写清 `--env-file` | 零改动 | 依赖人记住，且 cron / `make` / IDE 各写一遍 |
+| 引入 `python-dotenv` | 现成实现 | 为一个 20 行解析器加依赖，与"依赖最小化"冲突 |
+| 写 `run.ps1` / `run.sh` 包装 | 不改主程序 | 两套脚本要各自维护，容器内用不上 |
+| **`load_dotenv()` 内置到启动流程** ✅ | 任何入口都一致；仍兼容外部注入 | — |
+
+**决定**
+`shared/config.py` 提供 `load_dotenv(*paths, override=False)`：手工解析（支持注释、空行、`export` 前缀、成对引号），**已存在的环境变量优先**；`main()` 在解析参数后依次尝试 `config.yaml` 同目录与当前目录的 `.env`，缺失文件直接跳过。
+
+**代价 / 已知不足**
+- 不覆盖，所以想临时改一个值仍需在 shell 里覆盖（这是刻意的：`FOO=bar python main.py` 必须生效）
+- 不支持多行值与变量插值（`${OTHER}`），当前密钥都是单行常量，够用
+- 与 `override=False` 搭配的副作用：若 shell 里残留了过期的同名变量，程序会用它而不是 `.env` 里的新值
+
+**什么情况下应该重新评估**
+出现多环境（`.env.dev` / `.env.prod`）或需要变量插值时，改用 `python-dotenv` 或 `pydantic-settings`，不要在自研解析器上继续堆特性。
+
+---
+
 ## 附：被否决方案速查
 
 | 方案 | 否决原因 | 相关 ADR |
@@ -736,6 +774,7 @@ page_size=100  → 99992402  field validation failed   ← 采集器当时用的
 | 每次 INSERT 新行 | 同日多份日报造成歧义 | ADR-018 |
 | 自然日 00:00 窗口 | 跨零点数据丢失 | ADR-019 |
 | APScheduler 常驻 | 违背"无常驻服务"约束 | ADR-020 |
+| 依赖 `python-dotenv` | 一个 20 行解析器不值得加依赖 | ADR-024 |
 
 ---
 

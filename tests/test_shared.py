@@ -1,10 +1,11 @@
 import json
 import logging
+import os
 from pathlib import Path
 
 import pytest
 
-from shared.config import load_config
+from shared.config import load_config, load_dotenv
 from shared.errors import ConfigurationError
 from shared.logger import JsonLineFormatter
 from shared.storage import ReportStorage, export_report_files
@@ -46,6 +47,42 @@ members:
 
     with pytest.raises(ConfigurationError, match="members\\[0\\] missing required field"):
         load_config(config_path)
+
+
+def test_load_dotenv_populates_missing_variables(tmp_path, monkeypatch):
+    monkeypatch.delenv("DOTENV_ALPHA", raising=False)
+    monkeypatch.delenv("DOTENV_QUOTED", raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "# comment\n"
+        "\n"
+        "DOTENV_ALPHA=plain-value\n"
+        'DOTENV_QUOTED="quoted value"\n'
+        "export DOTENV_EXPORTED=exported\n",
+        encoding="utf-8",
+    )
+
+    loaded = load_dotenv(env_file)
+
+    assert "DOTENV_ALPHA" in loaded
+    assert os.environ["DOTENV_ALPHA"] == "plain-value"
+    assert os.environ["DOTENV_QUOTED"] == "quoted value"
+    assert os.environ["DOTENV_EXPORTED"] == "exported"
+    for key in ("DOTENV_ALPHA", "DOTENV_QUOTED", "DOTENV_EXPORTED"):
+        monkeypatch.delenv(key, raising=False)
+
+
+def test_load_dotenv_keeps_existing_environment(tmp_path, monkeypatch):
+    monkeypatch.setenv("DOTENV_EXISTING", "from-shell")
+    env_file = tmp_path / ".env"
+    env_file.write_text("DOTENV_EXISTING=from-file\n", encoding="utf-8")
+
+    assert load_dotenv(env_file) == []
+    assert os.environ["DOTENV_EXISTING"] == "from-shell"
+
+
+def test_load_dotenv_ignores_missing_files(tmp_path):
+    assert load_dotenv(tmp_path / "nope.env", tmp_path / "also-nope.env") == []
 
 
 def test_json_log_formatter_outputs_valid_json():

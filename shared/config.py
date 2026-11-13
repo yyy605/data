@@ -45,6 +45,42 @@ def load_config(path: str | Path = "config.yaml") -> AppConfig:
     return AppConfig(data=config)
 
 
+def load_dotenv(*paths: str | Path, override: bool = False) -> list[str]:
+    """Populate ``os.environ`` from ``.env`` files.
+
+    Missing files are ignored so callers can pass several candidate locations.
+    Existing environment variables win unless ``override`` is set, which keeps
+    ``FOO=bar python main.py`` working as expected.
+    """
+    loaded_keys: list[str] = []
+    for path in paths:
+        candidate = Path(path)
+        if not candidate.is_file():
+            continue
+        for raw_line in candidate.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            if line.startswith("export "):
+                line = line[len("export ") :]
+            key, _, value = line.partition("=")
+            key = key.strip()
+            if not key:
+                continue
+            if not override and os.getenv(key):
+                continue
+            os.environ[key] = _unquote(value)
+            loaded_keys.append(key)
+    return loaded_keys
+
+
+def _unquote(value: str) -> str:
+    text = value.strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in ("'", '"'):
+        return text[1:-1]
+    return text
+
+
 def resolve_env(config: Mapping[str, Any], key: str, required: bool = True) -> str | None:
     reference = config.get(key)
     if not isinstance(reference, str) or not reference:
