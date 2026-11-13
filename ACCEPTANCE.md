@@ -91,54 +91,48 @@ config           PASS  configuration loaded
 environment      PASS  all referenced variables are set
 github           PASS  HTTP 200
 lark             PASS  tenant_access_token acquired
-lark_scope_task  FAIL  missing scope task:task:read (app identity)
-lark_scope_msg   FAIL  missing scope im:message:readonly (app identity)
-lark_scope_chat  FAIL  missing scope im:chat:readonly (app identity)
+lark_scope_task  PASS  granted
+lark_scope_msg   PASS  granted
+lark_scope_chat  PASS  not required (lark.chat_id is configured)
 smtp             PASS  smtp.qq.com:465 reachable
 lark_webhook     PASS  open.feishu.cn reachable
 ```
 
-> 飞书三项 scope 未授予时，`--check` 会直接指出缺哪个权限，退出码为 1。
+退出码 `0`。`lark_scope_chat` 在 `lark.chat_id` 已配置时视为可选——该项权限只用于自动发现群 ID。
 
 ---
 
-## 七、待办事项（阻塞验收项 2、3）
+## 七、飞书接入现状
 
-### 1. 开通飞书应用权限
+### 已解决
 
-应用 ID：`cli_aa7fa5d60c799c1e`
+| 问题 | 现象 | 处理 |
+| --- | --- | --- |
+| 三项应用身份权限未授予 | `99991672 Access denied` | 在应用后台开通并发布版本 |
+| 机器人不在群内 | `230002 Bot/User can NOT be out of the chat` | 把应用添加为群机器人 |
+| 消息接口 `page_size` 超限 | `99992402 field validation failed`，掩盖了真实权限错误 | 夹在 1–50 |
+| 系统消息无发送者导致整源失败 | `Incomplete Lark message payload` | 只保留 `text`/`post`；单条不可用则跳过 |
 
-需开通并**发布新版本**（权限勾选后必须发布才生效）：
+### 当前数据现状（实测，非故障）
 
-| 权限码 | 用途 |
-| --- | --- |
-| `task:task:read` | 读取飞书任务 |
-| `im:message:readonly` | 读取群消息 |
-| `im:chat:readonly` | 查询群列表（用于获取 chat_id） |
+| 数据源 | API 返回 | 说明 |
+| --- | --- | --- |
+| 飞书任务 | `code=0`，可见任务 **0 条** | 应用可见范围内暂无任务；需在飞书任务中创建并共享给该应用 |
+| 飞书群消息 | `code=0`，近 90 天 8 条，全部为 `system` 通知与机器人卡片 | 群内尚无真人文本消息，暂无可采集的协作内容 |
 
-申请入口：
-```
-https://open.feishu.cn/app/cli_aa7fa5d60c799c1e/auth?q=task:task:read,im:message:readonly,im:chat:readonly
-```
+因此 `--dry-run` 输出 `count_lark_task=0 count_lark_msg=0 failed_sources=`（空）——**采集成功但无数据**，与采集失败有本质区别。
 
-发布路径：左侧「版本管理与发布」→ 创建版本 → 申请发布 →（管理员）审核通过。
+### 让数据出现的条件
 
-### 2. 补齐配置占位符
+- **任务板块**：在飞书任务里创建任务，并确保该应用在其可见范围内（任务清单共享给应用，或配置 `lark.tasklist_id`）
+- **协作沟通板块**：群内有真人发送的 `text` 或 `post` 消息，且命中 `lark.keywords` 任一关键词、不含 `excluded_keywords`
 
-`config.yaml` 中仍为示例值、需替换的字段：
+### 仍待补齐的配置
 
 | 字段 | 当前值 | 需替换为 |
 | --- | --- | --- |
-| `lark.chat_id` | `oc_example_chat_id` | 真实群 ID（`oc_` 开头） |
 | `members[1].github_login` | `github-user-2` | 于广飞的真实 GitHub 账号 |
 | `members[2].github_login` | `github-user-3` | 王博宁的真实 GitHub 账号 |
-
-### 3. 完成后复验
-
-```bash
-python main.py --check      # 六项应全 PASS
-python main.py --force      # 应显示 count_lark_task>0、count_lark_msg>0，且无 failed_sources
-```
 
 ---
 
