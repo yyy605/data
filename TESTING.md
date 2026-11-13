@@ -4,9 +4,9 @@
 | --- | --- |
 | 测试框架 | pytest 8.x |
 | 测试文件 | 10 个（`tests/`） |
-| 测试函数 | 66 个 |
-| 实际用例 | **68 个**（2 个参数化） |
-| 最近执行结果 | **68 passed** |
+| 测试函数 | 68 个 |
+| 实际用例 | **74 个**（3 个参数化） |
+| 最近执行结果 | **74 passed** |
 | 执行耗时 | 约 0.4s（全部使用 Mock，不访问网络） |
 
 配套文档：[ACCEPTANCE.md](./ACCEPTANCE.md)（验收结果报告）、[task.md](./task.md)（任务清单）。
@@ -175,6 +175,16 @@ uv run pytest -v
 | `test_report_files_are_exported` | 流程结束后 `reports/` 下生成 md/html，内容与数据库记录逐字一致 |
 | `test_file_export_failure_does_not_block_delivery` | 文件写入抛 `OSError` 时日报仍入库并正常推送，退出码 0 |
 
+### 3.10 环境自检 — `tests/test_checks.py`（2 个函数 / 6 个用例）
+
+| 用例 | 验证内容 |
+| --- | --- |
+| `test_probe_lark_scope_maps_codes_to_hints` | 参数化 5 种飞书返回码：`0`→授予、`99991672`→缺 scope 并给出具体权限名、`99992402`→参数校验失败、`99991663`→token 无效、未知码→原样带出 |
+| `test_probe_lark_scope_reports_connection_failure` | 网络异常时返回失败并标注 `connection failed`，不抛异常 |
+
+> 这组测试保障 `main.py --check` 能把飞书返回码翻译成可执行的提示，而不是只报一个数字。
+
+
 ---
 
 ## 四、手工验证流程
@@ -291,7 +301,7 @@ docker compose run --rm daily-report python main.py --check
 
 | 指标 | 基线 |
 | --- | --- |
-| 用例总数 | 68 |
+| 用例总数 | 74 |
 | 必须通过率 | 100% |
 | 执行时间上限 | < 5s（当前 0.5s） |
 | 网络依赖 | 0（全部 Mock） |
@@ -307,7 +317,7 @@ docker compose run --rm daily-report python main.py --check
 | `generator/*.py`、`generator/templates/*` | `tests/test_generator.py` |
 | `notifier/email.py` | `tests/test_email.py` |
 | `notifier/lark_bot.py` | `tests/test_lark_bot.py` |
-| `main.py` | `tests/test_schedule.py` + `tests/test_integration.py` |
+| `main.py` | `tests/test_schedule.py` + `tests/test_integration.py` + `tests/test_checks.py` |
 
 ---
 

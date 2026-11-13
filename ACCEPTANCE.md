@@ -6,8 +6,8 @@
 | 分支 | `main` |
 | 被验收的代码提交 | `5abc23c` |
 | 验收日期 | 2026-11-12 |
-| 代码规模 | 源码 16 文件 2345 行；测试 10 文件 1382 行 |
-| 自动化测试 | **68 个用例，全部通过** |
+| 代码规模 | 源码 16 文件 2438 行；测试 11 文件 1449 行 |
+| 自动化测试 | **74 个用例，全部通过** |
 
 本报告只记录**实测结果**。无法在当前环境验证的项目均明确标注为「待验证」，不做推测性结论。
 
@@ -87,13 +87,18 @@
 ## 六、环境自检结果（`python main.py --check`）
 
 ```
-config         PASS  configuration loaded
-environment    PASS  all referenced variables are set
-github         PASS  HTTP 200
-lark           PASS  ok（tenant_access_token 获取成功）
-smtp           PASS  smtp.qq.com:465 reachable
-lark_webhook   PASS  open.feishu.cn reachable
+config           PASS  configuration loaded
+environment      PASS  all referenced variables are set
+github           PASS  HTTP 200
+lark             PASS  tenant_access_token acquired
+lark_scope_task  FAIL  missing scope task:task:read (app identity)
+lark_scope_msg   FAIL  missing scope im:message:readonly (app identity)
+lark_scope_chat  FAIL  missing scope im:chat:readonly (app identity)
+smtp             PASS  smtp.qq.com:465 reachable
+lark_webhook     PASS  open.feishu.cn reachable
 ```
+
+> 飞书三项 scope 未授予时，`--check` 会直接指出缺哪个权限，退出码为 1。
 
 ---
 
@@ -148,7 +153,7 @@ uv run python main.py --check        # 连通性自检
 uv run python main.py --dry-run      # 采集+生成，不推送
 uv run python main.py                # 完整流程
 uv run python main.py --date 2026-11-12 --force   # 指定日期并跳过非工作日
-uv run pytest -q                     # 运行测试（68 项）
+uv run pytest -q                     # 运行测试（74 项）
 ```
 
 退出码：`0` 成功（含跳过非工作日、dry-run）；`1` 配置错误、全部数据源失败或推送失败。

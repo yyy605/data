@@ -186,7 +186,7 @@
 ## 验证状态说明
 
 ### 已自动化验证
-- 全部单元测试与集成测试通过（`pytest`，68 个用例）
+- 全部单元测试与集成测试通过（`pytest`，74 个用例）
 - GitHub Commit 采集、飞书消息采集、飞书 Token 获取端点经真实 API 探测确认存在
 - 飞书任务采集使用 Task v2 接口（`/open-apis/task/v2/tasks`），真实 API 返回鉴权错误而非 404，路径有效
 - HTML 由 Jinja2 模板（`generator/templates/report.html.jinja2`）渲染，标题自动转义

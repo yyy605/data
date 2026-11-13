@@ -159,7 +159,7 @@ def run_checks(config: AppConfig) -> int:
         results.append(("environment", True, "all referenced variables are set"))
 
     results.append(_check_github(config))
-    results.append(_check_lark(config))
+    results.extend(_check_lark(config))
     results.append(_check_smtp(config))
     results.append(_check_webhook(config))
 
@@ -404,12 +404,14 @@ def _check_github(config: AppConfig) -> tuple[str, bool, str]:
     return ("github", response.status_code < 400, f"HTTP {response.status_code}")
 
 
-def _check_lark(config: AppConfig) -> tuple[str, bool, str]:
+def _check_lark(config: AppConfig) -> list[tuple[str, bool, str]]:
+    """Check the tenant token plus each scope the collectors actually need."""
     section = config["lark"]
     app_id = os.getenv(str(section.get("app_id_env") or "LARK_APP_ID"))
     app_secret = os.getenv(str(section.get("app_secret_env") or "LARK_APP_SECRET"))
     if not app_id or not app_secret:
-        return ("lark", False, "missing Lark app credentials")
+        return [("lark", False, "missing Lark app credentials")]
+
     base_url = str(section.get("base_url", "https://open.feishu.cn")).rstrip("/")
     try:
         with httpx.Client(timeout=15) as client:
@@ -418,15 +420,92 @@ def _check_lark(config: AppConfig) -> tuple[str, bool, str]:
                 json={"app_id": app_id, "app_secret": app_secret},
             )
     except httpx.HTTPError as exc:
-        return ("lark", False, f"connection failed: {exc}")
+        return [("lark", False, f"connection failed: {exc}")]
     if response.status_code >= 400:
-        return ("lark", False, f"HTTP {response.status_code}")
+        return [("lark", False, f"HTTP {response.status_code}")]
     try:
         payload = response.json()
     except ValueError:
-        return ("lark", False, "invalid JSON response")
-    ok = payload.get("code", -1) == 0 and bool(payload.get("tenant_access_token"))
-    return ("lark", ok, str(payload.get("msg", "token acquired" if ok else "token missing")))
+        return [("lark", False, "invalid JSON response")]
+
+    token = payload.get("tenant_access_token")
+    if payload.get("code", -1) != 0 or not token:
+        return [("lark", False, str(payload.get("msg", "token missing")))]
+
+    results: list[tuple[str, bool, str]] = [("lark", True, "tenant_access_token acquired")]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    try:
+        with httpx.Client(timeout=15, headers=headers) as client:
+            results.append(
+                _probe_lark_scope(
+                    client,
+                    "lark_scope_task",
+                    f"{base_url}/open-apis/task/v2/tasks",
+                    {"page_size": 1},
+                    "task:task:read",
+                )
+            )
+
+            chat_id = str(section.get("chat_id") or "").strip()
+            if not chat_id:
+                results.append(("lark_scope_msg", False, "lark.chat_id is not configured"))
+            else:
+                results.append(
+                    _probe_lark_scope(
+                        client,
+                        "lark_scope_msg",
+                        f"{base_url}/open-apis/im/v1/messages",
+                        {"container_id_type": "chat", "container_id": chat_id, "page_size": 1},
+                        "im:message:readonly",
+                    )
+                )
+
+            results.append(
+                _probe_lark_scope(
+                    client,
+                    "lark_scope_chat",
+                    f"{base_url}/open-apis/im/v1/chats",
+                    {"page_size": 1},
+                    "im:chat:readonly",
+                )
+            )
+    except httpx.HTTPError as exc:
+        results.append(("lark_scope", False, f"connection failed: {exc}"))
+
+    return results
+
+
+def _probe_lark_scope(
+    client: httpx.Client,
+    name: str,
+    url: str,
+    params: Mapping[str, Any],
+    required_scope: str,
+) -> tuple[str, bool, str]:
+    """Turn a Feishu error code into an actionable hint about the missing scope."""
+    try:
+        response = client.get(url, params=params)
+    except httpx.HTTPError as exc:
+        return (name, False, f"connection failed: {exc}")
+
+    try:
+        payload = response.json()
+    except ValueError:
+        return (name, False, f"HTTP {response.status_code}, invalid JSON")
+
+    code = payload.get("code", -1)
+    if code == 0:
+        return (name, True, "granted")
+
+    message = str(payload.get("msg", ""))
+    if code == 99991672:
+        return (name, False, f"missing scope {required_scope} (app identity)")
+    if code == 99992402:
+        return (name, False, f"field validation failed: {message[:80]}")
+    if code in (99991663, 99991664, 99991668):
+        return (name, False, f"token invalid: {message[:80]}")
+    return (name, False, f"code {code}: {message[:80]}")
 
 
 def _check_smtp(config: AppConfig) -> tuple[str, bool, str]:
