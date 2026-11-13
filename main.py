@@ -503,6 +503,8 @@ def _probe_lark_scope(
         return (name, False, f"missing scope {required_scope} (app identity)")
     if code == 99992402:
         return (name, False, f"field validation failed: {message[:80]}")
+    if code == 230002:
+        return (name, False, "bot is not a member of this chat; add the app to the group")
     if code in (99991663, 99991664, 99991668):
         return (name, False, f"token invalid: {message[:80]}")
     return (name, False, f"code {code}: {message[:80]}")

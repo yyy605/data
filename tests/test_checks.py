@@ -27,6 +27,7 @@ class StubLarkClient:
         ({"code": 0, "msg": "ok"}, True, "granted"),
         ({"code": 99991672, "msg": "Access denied"}, False, "missing scope task:task:read"),
         ({"code": 99992402, "msg": "field validation failed"}, False, "field validation failed"),
+        ({"code": 230002, "msg": "Bot/User can NOT be out of the chat."}, False, "not a member of this chat"),
         ({"code": 99991663, "msg": "invalid token"}, False, "token invalid"),
         ({"code": 12345, "msg": "boom"}, False, "code 12345"),
     ],
